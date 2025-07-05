@@ -3,6 +3,8 @@ import { prisma } from '@/lib/prisma'
 import { socialEventSchema } from '@/types/zodSchemas'
 import { getServerSession } from 'next-auth'
 import { authOptions } from '@/lib/auth'
+import path from 'path'
+import { promises as fs } from 'fs'
 
 // GET: List all social events
 export async function GET() {
@@ -83,14 +85,83 @@ export async function DELETE(req: NextRequest) {
     const session = await getServerSession(authOptions)
     if (!session) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
     
-    const { id } = await req.json()
-    if (!id) return NextResponse.json({ error: 'Missing id' }, { status: 400 })
+    // Get event ID from URL parameters
+    const { searchParams } = new URL(req.url)
+    const id = searchParams.get('id')
+    if (!id) return NextResponse.json({ error: 'Missing id parameter' }, { status: 400 })
     
+    // Get all photos for this event before deleting
+    const photos = await prisma.photo.findMany({
+      where: { eventId: id },
+      select: { photoUrl: true }
+    })
+    
+    // Delete the event (this will cascade delete photos and comments due to Prisma schema)
     await prisma.socialEvent.delete({
       where: { id }
     })
     
-    return NextResponse.json({ success: true })
+    // Clean up photo files on disk
+    const PHOTO_UPLOAD_PATH = process.env.PHOTO_UPLOAD_PATH || path.join(process.cwd(), 'photos')
+    const deletedFiles = []
+    const fileErrors = []
+    
+    for (const photo of photos) {
+      try {
+        // Extract filename from photoUrl (e.g., "/api/photos/view/filename.jpg" -> "filename.jpg")
+        const fileName = photo.photoUrl.split('/').pop()
+        if (fileName) {
+          const filePath = path.join(PHOTO_UPLOAD_PATH, fileName)
+          
+          // Check if file exists and delete it
+          try {
+            await fs.access(filePath)
+            await fs.unlink(filePath)
+            deletedFiles.push(fileName)
+          } catch (fileError) {
+            // File doesn't exist or can't be deleted
+            console.warn(`Could not delete file ${filePath}:`, fileError)
+            fileErrors.push({ file: fileName, error: 'File not found or not accessible' })
+          }
+        }
+      } catch (error) {
+        console.error(`Error processing photo file ${photo.photoUrl}:`, error)
+        fileErrors.push({ file: photo.photoUrl, error: 'Processing error' })
+      }
+    }
+    
+    // Clean up orphaned files (files not linked to any event)
+    try {
+      const allFiles = await fs.readdir(PHOTO_UPLOAD_PATH)
+      const allPhotos = await prisma.photo.findMany({
+        select: { photoUrl: true }
+      })
+      
+      const linkedFiles = new Set(
+        allPhotos.map(photo => photo.photoUrl.split('/').pop()).filter(Boolean)
+      )
+      
+      for (const file of allFiles) {
+        if (!linkedFiles.has(file)) {
+          try {
+            const filePath = path.join(PHOTO_UPLOAD_PATH, file)
+            await fs.unlink(filePath)
+            console.log(`Deleted orphaned file: ${file}`)
+          } catch (error) {
+            console.warn(`Could not delete orphaned file ${file}:`, error)
+          }
+        }
+      }
+    } catch (error) {
+      console.warn('Error cleaning up orphaned files:', error)
+    }
+    
+    return NextResponse.json({ 
+      success: true,
+      deletedFiles,
+      fileErrors,
+      message: `Event deleted successfully. Deleted ${deletedFiles.length} photo files.`
+    })
   } catch (error) {
     console.error('Error deleting event:', error)
     return NextResponse.json({ error: 'Failed to delete event' }, { status: 500 })

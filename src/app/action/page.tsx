@@ -57,7 +57,6 @@ export default function ActionPage() {
           <UploadPhotoPopup 
             eventId={eventId}
             onClose={() => setShowUpload(false)}
-            autoOpenFileDialog={true}
           />
         )}
         {showPhotoComment && (

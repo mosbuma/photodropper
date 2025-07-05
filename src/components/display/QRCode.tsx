@@ -20,13 +20,13 @@ export default function QRCode({ photoId, eventId }: QRCodeProps) {
     <div className="bg-white p-2 rounded-lg shadow-lg cursor-pointer hover:shadow-xl transition-shadow" onClick={handleClick}>
       <QRCodeSVG 
         value={actionUrl}
-        size={128}
-        level="H"
+        size={256}
+        level="L"
         includeMargin={true}
       />
       <div className="text-center mt-2">
-        <p className="text-xs text-gray-600">Scan to upload</p>
-        <p className="text-xs text-blue-600">Click to open</p>
+        <p className="text-m font-bold text-black">DROP EEN FOTO</p>
+        <p className="text-m font-bold text-black">OF COMMENT</p>
       </div>
     </div>
   )

@@ -97,7 +97,6 @@ export default function DisplayPage() {
       <Ticker 
         photoComments={photoComments}
         eventComments={eventComments}
-        speed={50} // Default speed, should come from event settings
       />
     </div>
   )

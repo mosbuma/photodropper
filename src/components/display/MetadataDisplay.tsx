@@ -41,18 +41,17 @@ export default function MetadataDisplay({ dateTaken, location }: MetadataDisplay
     return null
   }
 
+  const className='text-base font-bold bg-yellow-500 text-white flex items-center px-2 py-4 rounded-lg';
+  const style={fontSize: '48px', minWidth: '250px', minHeight: '48px'};
+
   return (
-    <div className="bg-black bg-opacity-80 rounded-lg px-5 py-2 shadow-lg flex flex-col items-end min-w-[160px] max-w-xs" style={{fontFamily: 'Inter, Roboto, Arial, sans-serif', letterSpacing: '0.01em'}}>
-      {formattedDate && (
-        <div className="text-base font-bold text-white drop-shadow mb-1 leading-tight">
-          {formattedDate}
-        </div>
-      )}
-      {location && (
-        <div className="text-sm text-white font-medium flex items-center gap-1 drop-shadow">
-          <span className="truncate" style={{fontFamily: 'Inter, Roboto, Arial, sans-serif', fontSize: '48px'}}>{location}</span>
-        </div>
-      )}
+    <div key="metadata" className="flex flex-col gap-2">
+      <div key="date" className={`${className} ${formattedDate ? 'visible' : 'invisible'}`} style={style}>
+        {formattedDate || 'XXXX'}
+      </div>
+      <div key="location" className={`${className} ${location ? 'visible' : 'invisible'}`} style={style}>
+        {location || 'XXXX'}
+      </div>
     </div>
   )
 } 

@@ -1,32 +1,11 @@
 'use client'
 
-import { useEffect, useState } from 'react'
-import { useAppSelector, useAppDispatch } from '@/lib/hooks'
-import { setCurrentPhotoIndex } from '@/lib/slices/appSlice'
+import { useState } from 'react'
+import { useAppSelector } from '@/lib/hooks'
 
 export default function ImageDisplay() {
-  const dispatch = useAppDispatch()
   const { currentPlaylist, currentPhotoIndex } = useAppSelector(state => state.app)
-  const [isTransitioning, setIsTransitioning] = useState(false)
-
-  // Auto-advance slideshow
-  useEffect(() => {
-    if (!currentPlaylist?.photoStream || currentPlaylist.photoStream.length === 0) {
-      return
-    }
-
-    const interval = setInterval(() => {
-      const nextIndex = (currentPhotoIndex + 1) % currentPlaylist.photoStream.length
-      setIsTransitioning(true)
-      
-      setTimeout(() => {
-        dispatch(setCurrentPhotoIndex(nextIndex))
-        setIsTransitioning(false)
-      }, 500) // Transition duration
-    }, 5000) // Default 5 seconds per photo
-
-    return () => clearInterval(interval)
-  }, [currentPhotoIndex, currentPlaylist, dispatch])
+  const [isTransitioning] = useState(false)
 
   const photoUrl = currentPlaylist?.photoStream?.[currentPhotoIndex]?.photoUrl
   if (!photoUrl) {

@@ -17,8 +17,20 @@ interface PhotoMeta {
   date: string
 }
 
+// Extract EXIF data from file using exifreader
+export const extractExifData = async (file: File): Promise<ExifReader.Tags> => {
+    try {
+      const tags = await ExifReader.load(file);
+      return tags;
+    } catch (err) {
+      console.error('Error extracting EXIF:', err);
+      return {} as ExifReader.Tags;
+    }
+}
+
+
 // Lookup location name from lat/lng using Nominatim
-async function getLocationFromExif(exifData: ExifReader.Tags): Promise<string | null> {
+export async function getLocationFromExif(exifData: ExifReader.Tags): Promise<string | null> {
   try {
     console.log('*** [getLocationFromExif] exifData:', JSON.stringify(Object.keys(exifData), null, 2));
     console.log('*** [getLocationFromExif] lat:', exifData.GPSLatitude?.description);
@@ -56,17 +68,6 @@ export default function UploadPhotoPopup({ eventId, onClose }: UploadPhotoPopupP
   })
   const [error, setError] = useState<string | null>(null)
   const [photoUrl, setPhotoUrl] = useState<string | null>(null)
-
-  // Extract EXIF data from file using exifreader
-  const extractExifData = async (file: File): Promise<ExifReader.Tags> => {
-    try {
-      const tags = await ExifReader.load(file);
-      return tags;
-    } catch (err) {
-      console.error('Error extracting EXIF:', err);
-      return {} as ExifReader.Tags;
-    }
-  }
 
   // Step 1: Select file and upload
   const handleFileChange = (e: React.ChangeEvent<HTMLInputElement>) => {

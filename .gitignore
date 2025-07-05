@@ -108,6 +108,7 @@ prisma/migrations/
 # Uploaded photos (if stored locally)
 photos/
 uploads/
+import/
 
 # Database
 *.db
