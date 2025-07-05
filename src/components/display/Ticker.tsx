@@ -8,7 +8,7 @@ interface TickerProps {
   eventComments: CommentStreamItem[]
 }
 
-export default function Ticker({ photoComments, eventComments, speed }: TickerProps) {
+export default function Ticker({ photoComments, eventComments }: TickerProps) {
   const hasPhotoComments = photoComments.length > 0
   const hasEventComments = eventComments.length > 0
 

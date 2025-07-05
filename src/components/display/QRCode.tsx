@@ -3,8 +3,8 @@
 import { QRCodeSVG } from 'qrcode.react'
 
 interface QRCodeProps {
-  photoId?: string
-  eventId: string
+  photoId: string | null
+  eventId: string | null
 }
 
 export default function QRCode({ photoId, eventId }: QRCodeProps) {
@@ -14,6 +14,10 @@ export default function QRCode({ photoId, eventId }: QRCodeProps) {
   const handleClick = () => {
     // Open action page in new tab when QR code is clicked
     window.open(actionUrl, '_blank')
+  }
+
+  if(!eventId || !photoId) {
+    return null
   }
   
   return (
