@@ -90,49 +90,42 @@ export default function PasswordDialog({ onClose }: PasswordDialogProps) {
 
   return (
     <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50" onClick={handleOverlayClick}>
-      <div ref={dialogRef} className="bg-gray-800 rounded-lg p-6 w-full max-w-md mx-4 z-60 relative" onClick={e => e.stopPropagation()}>
-        <h2 className="text-xl font-bold mb-4">Photodropper</h2>
-        
+      <div
+        ref={dialogRef}
+        className="bg-white text-gray-900 rounded-xl p-8 w-full max-w-md mx-4 shadow-2xl border border-gray-200"
+        onClick={e => e.stopPropagation()}
+      >
+        <h2 className="text-2xl font-bold mb-6 text-center">Photodropper</h2>
+
         {/* Event Selection Section */}
-        <div className="mb-6">
-          <h3 className="text-lg font-semibold mb-3">Select Event</h3>
-          {loadingEvents ? (
-            <div className="text-center py-4">
-              <div className="inline-block animate-spin rounded-full h-6 w-6 border-b-2 border-white mb-2"></div>
-              <p className="text-gray-400">Loading events...</p>
-            </div>
-          ) : events.length > 0 ? (
-            <div className="space-y-3">
-              <select
-                value={selectedEventId}
-                onChange={(e) => setSelectedEventId(e.target.value)}
-                className="w-full px-3 py-2 bg-gray-700 border border-gray-600 rounded focus:outline-none focus:border-blue-500 text-white"
-              >
-                <option value="">Choose an event...</option>
-                {events.map((event) => (
-                  <option key={event.id} value={event.id}>
-                    {event.name}
-                  </option>
-                ))}
-              </select>
-              <button
-                onClick={handleEventSelect}
-                disabled={!selectedEventId}
-                className="w-full bg-green-600 hover:bg-green-700 disabled:bg-gray-600 py-2 px-4 rounded font-medium"
-              >
-                SELECT EVENT
-              </button>
-            </div>
-          ) : (
-            <p className="text-gray-400 text-center py-4">
-              No events found. Please log in to create an event.
-            </p>
-          )}
+        <div className="mb-8">
+          <h3 className="text-lg font-semibold mb-2">Select Event</h3>
+          <select
+            value={selectedEventId}
+            onChange={e => setSelectedEventId(e.target.value)}
+            className="w-full px-3 py-2 bg-white border border-gray-400 rounded text-gray-900 focus:outline-none focus:border-blue-500 mb-4"
+          >
+            <option value="">Choose an event...</option>
+            {events.map((event) => (
+              <option key={event.id} value={event.id}>
+                {event.name}
+              </option>
+            ))}
+          </select>
+          <button
+            onClick={handleEventSelect}
+            disabled={!selectedEventId}
+            className="w-full bg-green-600 hover:bg-green-700 disabled:bg-gray-400 text-white py-2 px-4 rounded font-medium transition"
+          >
+            SELECT EVENT
+          </button>
         </div>
 
+        <hr className="my-6 border-gray-300" />
+
         {/* Admin Login Section */}
-        <div className="border-t border-gray-700 pt-4">
-          <h3 className="text-lg font-semibold mb-3">Admin Access</h3>
+        <div>
+          <h3 className="text-lg font-semibold mb-2">Admin Access</h3>
           <form onSubmit={handleSubmit} className="space-y-4">
             <div>
               <label htmlFor="password" className="block text-sm font-medium mb-2">
@@ -142,29 +135,25 @@ export default function PasswordDialog({ onClose }: PasswordDialogProps) {
                 type="password"
                 id="password"
                 value={password}
-                onChange={(e) => setPassword(e.target.value)}
-                className="w-full px-3 py-2 bg-gray-700 border border-gray-600 rounded focus:outline-none focus:border-blue-500 text-white"
+                onChange={e => setPassword(e.target.value)}
+                className="w-full px-3 py-2 bg-white border border-gray-400 rounded text-gray-900 focus:outline-none focus:border-blue-500"
                 placeholder="Enter password"
                 required
               />
             </div>
-            
-            {error && (
-              <p className="text-red-400 text-sm">{error}</p>
-            )}
-            
+            {error && <p className="text-red-500 text-sm">{error}</p>}
             <div className="flex space-x-3">
               <button
                 type="submit"
                 disabled={loading}
-                className="flex-1 bg-blue-600 hover:bg-blue-700 disabled:bg-gray-600 py-2 px-4 rounded font-medium"
+                className="flex-1 bg-blue-600 hover:bg-blue-700 disabled:bg-gray-400 text-white py-2 px-4 rounded font-medium transition"
               >
                 {loading ? 'Checking...' : 'LOGIN'}
               </button>
               <button
                 type="button"
                 onClick={handleClose}
-                className="flex-1 bg-gray-600 hover:bg-gray-700 py-2 px-4 rounded font-medium"
+                className="flex-1 bg-gray-300 hover:bg-gray-400 text-gray-900 py-2 px-4 rounded font-medium transition"
               >
                 CLOSE
               </button>

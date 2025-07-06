@@ -1,7 +1,8 @@
 'use client'
 
-import { useState } from 'react'
+import { useState, useEffect } from 'react'
 import Spinner from '@/components/ui/Spinner'
+import { useAppSelector } from '@/lib/hooks'
 
 interface CommentPopupProps {
   eventId: string
@@ -17,6 +18,43 @@ export default function CommentPopup({ eventId, photoId, type, onClose }: Commen
   const [comment, setComment] = useState('')
   const [isSubmitting, setIsSubmitting] = useState(false)
   const [error, setError] = useState<string | null>(null)
+  const [photoUrl, setPhotoUrl] = useState<string | null>(null)
+
+  const { currentPlaylist } = useAppSelector(state => state.app)
+
+  // Find the photoUrl for the given photoId (if type is 'photo')
+  useEffect(() => {
+    if (type === 'photo' && photoId) {
+      // First try to get from currentPlaylist (main app)
+      if (currentPlaylist) {
+        const photo = currentPlaylist.photoStream.find(p => p.photoId === photoId)
+        if (photo?.photoUrl) {
+          setPhotoUrl(photo.photoUrl)
+          return
+        }
+      }
+      
+      // If not found in playlist, fetch directly from API (action page)
+      const fetchPhoto = async () => {
+        try {
+          const response = await fetch(`/api/photos?id=${photoId}`)
+          if (response.ok) {
+            const photoData = await response.json()
+            setPhotoUrl(photoData.photoUrl)
+          }
+        } catch (err) {
+          console.error('Error fetching photo:', err)
+        }
+      }
+      
+      fetchPhoto()
+    }
+  }, [type, photoId, currentPlaylist])
+
+  console.log(`[CommentPopup] type: ${type}`)
+  console.log(`[CommentPopup] photoId: ${photoId}`)
+  console.log(`[CommentPopup] currentPlaylist: ${JSON.stringify(currentPlaylist)}`)
+  console.log(`[CommentPopup] photoUrl: ${photoUrl}`)
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault()
@@ -74,6 +112,18 @@ export default function CommentPopup({ eventId, photoId, type, onClose }: Commen
         </h2>
 
         <form onSubmit={handleSubmit}>
+          {/* Photo preview for photo comments */}
+          {type === 'photo' && photoUrl && (
+            <div className="flex justify-center mb-3">
+              {/* eslint-disable-next-line @next/next/no-img-element */}
+              <img
+                src={photoUrl}
+                alt="Photo preview"
+                className="w-auto h-48 object-cover rounded shadow border"
+                style={{ background: '#eee' }}
+              />
+            </div>
+          )}
           <input
             type="text"
             placeholder="Name (Anonymous)"

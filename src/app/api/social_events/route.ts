@@ -5,6 +5,7 @@ import { getServerSession } from 'next-auth'
 import { authOptions } from '@/lib/auth'
 import path from 'path'
 import { promises as fs } from 'fs'
+import { list, del } from '@vercel/blob'
 
 // GET: List all social events
 export async function GET() {
@@ -130,6 +131,33 @@ export async function DELETE(req: NextRequest) {
       }
     }
     
+    // Clean up Vercel blobs for this event's photos
+    const deletedBlobs = []
+    const blobErrors = []
+    
+    try {
+      // Get all blobs in Vercel storage
+      const blobs = await list()
+      
+      // Delete blobs that match the photos from this event
+      for (const photo of photos) {
+        const matchingBlob = blobs.blobs.find((blob: { url: string; pathname: string }) => blob.url === photo.photoUrl)
+        if (matchingBlob) {
+          try {
+            await del(matchingBlob.pathname)
+            deletedBlobs.push(photo.photoUrl)
+            console.log(`Deleted Vercel blob: ${photo.photoUrl}`)
+          } catch (blobError) {
+            console.error(`Error deleting Vercel blob ${photo.photoUrl}:`, blobError)
+            blobErrors.push({ blob: photo.photoUrl, error: 'Blob deletion failed' })
+          }
+        }
+      }
+    } catch (blobListError) {
+      console.error('Error listing Vercel blobs:', blobListError)
+      blobErrors.push({ blob: 'N/A', error: 'Failed to list blobs' })
+    }
+    
     // Clean up orphaned files (files not linked to any event)
     try {
       const allFiles = await fs.readdir(PHOTO_UPLOAD_PATH)
@@ -160,7 +188,9 @@ export async function DELETE(req: NextRequest) {
       success: true,
       deletedFiles,
       fileErrors,
-      message: `Event deleted successfully. Deleted ${deletedFiles.length} photo files.`
+      deletedBlobs,
+      blobErrors,
+      message: `Event deleted successfully. Deleted ${deletedFiles.length} photo files and ${deletedBlobs.length} Vercel blobs.`
     })
   } catch (error) {
     console.error('Error deleting event:', error)

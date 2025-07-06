@@ -28,6 +28,13 @@ export default function ManagementPage() {
   const [importing, setImporting] = useState(false)
   const [cleaning, setCleaning] = useState(false)
   const [creatingDemo, setCreatingDemo] = useState(false)
+  const [cleanupSummary, setCleanupSummary] = useState<string | null>(null)
+  const [editEvent, setEditEvent] = useState<SocialEvent | null>(null)
+  const [editEventName, setEditEventName] = useState('')
+  const [savingEvent, setSavingEvent] = useState(false)
+  const [editEventError, setEditEventError] = useState<string | null>(null)
+  const [editEventPhotoDuration, setEditEventPhotoDuration] = useState<number>(0)
+  const [editEventScrollSpeed, setEditEventScrollSpeed] = useState<number>(0)
 
   const tabs = [
     { id: 'events', label: 'Events' },
@@ -137,7 +144,7 @@ export default function ManagementPage() {
   }
 
   const handleCleanupPhotos = async () => {
-    if (!confirm('This will delete all photo files on disk that are not linked to any event. Continue?')) {
+    if (!confirm('This will delete all photo files that are not linked to any event. Continue?')) {
       return
     }
 
@@ -150,7 +157,14 @@ export default function ManagementPage() {
 
       if (response.ok) {
         const result = await response.json()
-        alert(`Cleanup completed!\n\nSummary:\n- Files on disk: ${result.summary.totalFilesOnDisk}\n- Linked in database: ${result.summary.linkedFilesInDatabase}\n- Orphaned files found: ${result.summary.orphanedFilesFound}\n- Files deleted: ${result.summary.filesDeleted}\n- Errors: ${result.summary.filesWithErrors}`)
+        let summary = ''
+        if (result.summary) {
+          summary += `- Files on disk: ${result.summary.totalFilesOnDisk}\n- Linked in database: ${result.summary.linkedFilesInDatabase}\n- Orphaned files found: ${result.summary.orphanedFilesFound}\n- Files deleted: ${result.summary.filesDeleted}\n- Errors: ${result.summary.filesWithErrors}`
+        }
+        if (result.deletedBlobs) {
+          summary += `\n- Blobs in Vercel: ${result.totalBlobs}\n- Orphaned blobs: ${result.orphanedCount}\n- Blobs deleted: ${result.deletedBlobs.length}`
+        }
+        setCleanupSummary(summary)
       } else {
         const error = await response.json()
         alert(`Cleanup failed: ${error.error}`)
@@ -471,6 +485,50 @@ export default function ManagementPage() {
     }
   }, [activeEventId])
 
+  // Edit event handler
+  const handleEditEvent = (event: SocialEvent) => {
+    setEditEvent(event)
+    setEditEventName(event.name)
+    setEditEventPhotoDuration(event.photoDurationMs || 0)
+    setEditEventScrollSpeed(event.scrollSpeedPct || 0)
+    setEditEventError(null)
+  }
+
+  const handleSaveEditEvent = async () => {
+    if (!editEvent) return
+    setSavingEvent(true)
+    setEditEventError(null)
+    try {
+      const response = await fetch(`/api/social_events?id=${editEvent.id}`, {
+        method: 'PUT',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          id: editEvent.id,
+          name: editEventName,
+          photoDurationMs: editEventPhotoDuration,
+          scrollSpeedPct: editEventScrollSpeed
+        })
+      })
+      if (response.ok) {
+        const updated = await response.json()
+        setEvents(events => events.map(e => e.id === updated.id ? updated : e))
+        setEditEvent(null)
+      } else {
+        const error = await response.json()
+        setEditEventError(error.error || 'Failed to update event')
+      }
+    } catch (err) {
+      setEditEventError('Failed to update event')
+    } finally {
+      setSavingEvent(false)
+    }
+  }
+
+  // Validation for event fields
+  const isPhotoDurationValid = editEventPhotoDuration >= 0
+  const isScrollSpeedValid = editEventScrollSpeed >= 0 && editEventScrollSpeed <= 100
+  const isEditEventValid = editEventName.trim() && isPhotoDurationValid && isScrollSpeedValid
+
   // Show loading while checking authentication
   if (status === 'loading') {
     return (
@@ -594,7 +652,7 @@ export default function ManagementPage() {
                       >
                         Set Active
                       </button>
-                      <button className="text-gray-400 hover:text-gray-300 text-sm">
+                      <button className="text-gray-400 hover:text-gray-300 text-sm" onClick={() => handleEditEvent(event)}>
                         Edit
                       </button>
                       <button
@@ -630,9 +688,6 @@ export default function ManagementPage() {
                   className="bg-green-600 hover:bg-green-700 disabled:bg-gray-600 px-4 py-2 rounded"
                 >
                   {importing ? 'Importing...' : 'Import Photos'}
-                </button>
-                <button className="bg-blue-600 hover:bg-blue-700 px-4 py-2 rounded">
-                  Upload Photos
                 </button>
                 <button 
                   onClick={handleCleanupPhotos}
@@ -887,6 +942,80 @@ export default function ManagementPage() {
                 {deletingEvent ? 'Deleting...' : 'Delete Event'}
               </button>
               <button className="bg-gray-400 hover:bg-gray-500 text-white px-4 py-2 rounded" onClick={() => setDeleteEvent(null)}>Cancel</button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* Cleanup Summary Modal */}
+      {cleanupSummary && (
+        <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50">
+          <div className="bg-white text-gray-900 rounded-xl p-8 w-full max-w-md mx-4 shadow-2xl border border-gray-200" onClick={e => e.stopPropagation()}>
+            <h2 className="text-2xl font-bold mb-6 text-center">Cleanup Completed</h2>
+            <pre className="whitespace-pre-wrap text-sm mb-6">{cleanupSummary}</pre>
+            <div className="flex justify-center">
+              <button
+                className="bg-blue-600 hover:bg-blue-700 text-white py-2 px-6 rounded font-medium transition"
+                onClick={() => setCleanupSummary(null)}
+              >
+                Close
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* Edit Event Modal */}
+      {editEvent && (
+        <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50">
+          <div className="bg-white text-gray-900 rounded-xl p-8 w-full max-w-md mx-4 shadow-2xl border border-gray-200" onClick={e => e.stopPropagation()}>
+            <h2 className="text-2xl font-bold mb-6 text-center">Edit Event</h2>
+            <label className="block text-sm font-medium mb-2">Event Name</label>
+            <input
+              type="text"
+              className="w-full px-3 py-2 bg-white border border-gray-400 rounded text-gray-900 focus:outline-none focus:border-blue-500 mb-4"
+              value={editEventName}
+              onChange={e => setEditEventName(e.target.value)}
+              maxLength={100}
+            />
+            <label className="block text-sm font-medium mb-2">Photo Duration (ms)</label>
+            <input
+              type="number"
+              className="w-full px-3 py-2 bg-white border border-gray-400 rounded text-gray-900 focus:outline-none focus:border-blue-500 mb-2"
+              value={editEventPhotoDuration}
+              min={0}
+              max={60000}
+              step={100}
+              onChange={e => setEditEventPhotoDuration(Number(e.target.value))}
+            />
+            {!isPhotoDurationValid && <div className="text-red-500 text-xs mb-2">Photo duration must be 0 or greater.</div>}
+            <label className="block text-sm font-medium mb-2">Scroll Speed (%)</label>
+            <input
+              type="number"
+              className="w-full px-3 py-2 bg-white border border-gray-400 rounded text-gray-900 focus:outline-none focus:border-blue-500 mb-2"
+              value={editEventScrollSpeed}
+              min={0}
+              max={100}
+              step={1}
+              onChange={e => setEditEventScrollSpeed(Number(e.target.value))}
+            />
+            {!isScrollSpeedValid && <div className="text-red-500 text-xs mb-2">Scroll speed must be between 0 and 100.</div>}
+            {editEventError && <div className="text-red-500 text-sm mb-4">{editEventError}</div>}
+            <div className="flex justify-center gap-4 mt-4">
+              <button
+                className="bg-blue-600 hover:bg-blue-700 text-white py-2 px-6 rounded font-medium transition"
+                onClick={handleSaveEditEvent}
+                disabled={savingEvent || !isEditEventValid}
+              >
+                {savingEvent ? 'Saving...' : 'Save'}
+              </button>
+              <button
+                className="bg-gray-300 hover:bg-gray-400 text-gray-900 py-2 px-6 rounded font-medium transition"
+                onClick={() => setEditEvent(null)}
+                disabled={savingEvent}
+              >
+                Cancel
+              </button>
             </div>
           </div>
         </div>

@@ -29,16 +29,16 @@ export default function Home() {
     prevEventIdRef.current = activeEventId
   }, [activeEventId, dispatch])
 
-  // Show dialog automatically when no active event
+  const hasPhotos = !!currentPlaylist?.photoStream?.length
+
+  // Show dialog automatically when no active event AND there are photos
   useEffect(() => {
-    // if (!activeEventId) {
-    //   console.log(`[Home] useEffect activeEventId: ${activeEventId}`)
-    //   setShowPasswordDialog(true)
-    // } else {
-    //   console.log(`[Home] useEffect activeEventId: ${activeEventId}`)
-    //   setShowPasswordDialog(false)
-    // }
-  }, [activeEventId])
+    if (!activeEventId && hasPhotos) {
+      setShowPasswordDialog(true)
+    } else {
+      setShowPasswordDialog(false)
+    }
+  }, [activeEventId, hasPhotos])
 
   // Start playlist polling when event is set as active
   useEffect(() => {
@@ -99,20 +99,6 @@ export default function Home() {
     setShowPasswordDialog(false)
   }
 
-  // If no active event, show placeholder (but allow modal to show)
-  // if (showPasswordDialog) {
-  //   return (
-  //     <div className="min-h-screen bg-black flex items-center justify-center">
-  //       <div className="text-white text-center">
-  //         <h1 className="text-4xl font-bold mb-4">Photodropper</h1>
-  //         <p className="text-xl">No active event</p>
-  //         <p className="text-gray-400 mt-2">Click anywhere to access admin panel</p>
-  //       </div>
-  //       <PasswordDialog onClose={handleClosePasswordDialog} /> }
-  //     </div>
-  //   )
-  // }
-
   // Get current photo and comments
   const currentPhoto = currentPlaylist?.photoStream?.[currentPhotoIndex]
   const photoComments = currentPhoto?.comments || []
@@ -124,18 +110,27 @@ export default function Home() {
 
   return (
     <div className="min-h-screen bg-black relative overflow-hidden" onClick={handlePageClick}>
-      {/* Main Photo Display */}
-      <ImageDisplay />
+      {/* Main Photo Display or Placeholder */}
+      {currentPhoto?.photoUrl ? (
+        <ImageDisplay />
+      ) : (
+        <div className="h-screen bg-black flex items-center justify-center">
+          <div className="text-white text-center">
+            <h2 className="text-2xl font-bold mb-2">No Photos</h2>
+            <p className="text-gray-400">Upload some photos to get started!</p>
+          </div>
+        </div>
+      )}
 
-      {/* QR Code - Top Left */}
+      {/* QR Code - Top Left (always visible) */}
       <div className="absolute top-4 left-4 z-10">
         <QRCode 
           photoId={currentPhoto?.photoId || ''}
-          eventId={activeEventId}
+          eventId={activeEventId || ''}
         />
       </div>
 
-      {/* Metadata - Top Right */}
+      {/* Metadata - Top Right (only if photo) */}
       <div className="absolute top-4 right-4 z-10">
         <MetadataDisplay 
           dateTaken={currentPhoto?.dateTaken || null}

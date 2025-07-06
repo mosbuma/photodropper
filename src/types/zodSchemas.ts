@@ -24,7 +24,7 @@ export const commentSchema = z.object({
   photoId: z.string().uuid().nullable().optional(),
   index: z.number().int(),
   comment: z.string().min(1).max(100),
-  commenterName: z.string().max(10).optional(),
+  commenterName: z.string().max(10).optional().nullable(),
   visible: z.boolean().optional(),
   showFrom: z.string().optional(),
   showTo: z.string().optional(),
