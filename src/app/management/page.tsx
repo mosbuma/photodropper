@@ -6,9 +6,10 @@ import { useSession, signIn } from 'next-auth/react'
 import { useAppSelector, useAppDispatch } from '@/lib/hooks'
 import { setActiveEvent } from '@/lib/slices/appSlice'
 import { playlistManager } from '@/lib/playlistManager'
-import type { SocialEvent } from '@prisma/client'
+import type { SocialEvent } from '@/types/socialEvent'
 import type { CommentStreamItem, PhotoStreamItem } from '@/lib/slices/appSlice'
 import BulkUploadPopup from '@/components/action/BulkUploadPopup'
+import QRCode from '@/components/display/QRCode'
 
 export default function ManagementPage() {
   const router = useRouter()
@@ -34,7 +35,13 @@ export default function ManagementPage() {
   const [editEventError, setEditEventError] = useState<string | null>(null)
   const [editEventPhotoDuration, setEditEventPhotoDuration] = useState<number>(0)
   const [editEventScrollSpeed, setEditEventScrollSpeed] = useState<number>(0)
+  const [editEventCommentStyle, setEditEventCommentStyle] = useState<'TICKER' | 'COMICBOOK'>('TICKER')
   const [showBulkUpload, setShowBulkUpload] = useState(false)
+  const [showNewEventModal, setShowNewEventModal] = useState(false)
+  const [newEventName, setNewEventName] = useState('')
+  const [newEventCommentStyle, setNewEventCommentStyle] = useState<'TICKER' | 'COMICBOOK'>('TICKER')
+  const [creatingEvent, setCreatingEvent] = useState(false)
+  const [newEventError, setNewEventError] = useState<string | null>(null)
 
   const tabs = useMemo(() => [
     { id: 'events', label: 'Events' },
@@ -50,32 +57,40 @@ export default function ManagementPage() {
     router.push('/')
   }
 
-  const handleNewEvent = async () => {
-    const eventName = prompt('Enter event name:')
-    if (!eventName) return
+  const handleNewEvent = () => {
+    setShowNewEventModal(true)
+    setNewEventName('')
+    setNewEventCommentStyle('TICKER')
+    setNewEventError(null)
+  }
 
+  const handleCreateEvent = async () => {
+    if (!newEventName.trim()) {
+      setNewEventError('Event name is required')
+      return
+    }
+    setCreatingEvent(true)
+    setNewEventError(null)
     try {
-      setLoading(true)
       const response = await fetch('/api/social_events', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ name: eventName })
+        body: JSON.stringify({ name: newEventName, commentStyle: newEventCommentStyle })
       })
-
       if (response.ok) {
         const newEvent = await response.json()
         setEvents(prev => [...prev, newEvent])
-        // Immediately set the new event as active
         dispatch(setActiveEvent(newEvent.id))
+        setShowNewEventModal(false)
         alert('Event created successfully!')
       } else {
-        alert('Failed to create event')
+        const error = await response.json()
+        setNewEventError(error.error || 'Failed to create event')
       }
-    } catch (error) {
-      console.error('Error creating event:', error)
-      alert('Error creating event')
+    } catch {
+      setNewEventError('Error creating event')
     } finally {
-      setLoading(false)
+      setCreatingEvent(false)
     }
   }
 
@@ -157,8 +172,6 @@ export default function ManagementPage() {
       setCleaning(false)
     }
   }
-
-
 
   const loadEvents = async () => {
     try {
@@ -296,6 +309,7 @@ export default function ManagementPage() {
     setEditEventName(event.name)
     setEditEventPhotoDuration(event.photoDurationMs || 0)
     setEditEventScrollSpeed(event.scrollSpeedPct || 0)
+    setEditEventCommentStyle((event.commentStyle as 'TICKER' | 'COMICBOOK') || 'TICKER')
     setEditEventError(null)
   }
 
@@ -311,7 +325,8 @@ export default function ManagementPage() {
           id: editEvent.id,
           name: editEventName,
           photoDurationMs: editEventPhotoDuration,
-          scrollSpeedPct: editEventScrollSpeed
+          scrollSpeedPct: editEventScrollSpeed,
+          commentStyle: editEventCommentStyle,
         })
       })
       if (response.ok) {
@@ -530,10 +545,37 @@ export default function ManagementPage() {
                           alt="Photo"
                           className="w-full h-48 object-cover"
                         />
+                        {(photo.uploaderName || photo.location || photo.dateTaken) && (
+                          <div className="flex flex-row flex-wrap gap-2 justify-center items-center mt-1 mb-1 w-full">
+                            {photo.uploaderName && (
+                              <span className="inline-block bg-green-200 text-black text-xs font-semibold px-2 py-0.5 rounded border border-black shadow-sm">
+                                {photo.uploaderName}
+                              </span>
+                            )}
+                            {photo.location && (
+                              <span className="inline-block bg-yellow-200 text-black text-xs font-semibold px-2 py-0.5 rounded border border-black shadow-sm">
+                                {photo.location}
+                              </span>
+                            )}
+                            {photo.dateTaken && (
+                              <span className="inline-block bg-blue-200 text-black text-xs font-semibold px-2 py-0.5 rounded border border-black shadow-sm">
+                                {new Date(photo.dateTaken).toLocaleDateString()}
+                              </span>
+                            )}
+                            {/* Action buttons (edit/delete) */}
+                            <div className="flex gap-2 items-center ml-auto">
+                              <button onClick={() => setEditPhoto(photo)} className="bg-white rounded-full p-1 shadow hover:bg-blue-100">
+                                {/* Edit icon (pencil) */}
+                                <svg width="20" height="20" fill="none" viewBox="0 0 24 24" stroke="currentColor" className="text-blue-600"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15.232 5.232l3.536 3.536M9 13l6.586-6.586a2 2 0 112.828 2.828L11.828 15.828a2 2 0 01-1.414.586H7v-3a2 2 0 01.586-1.414z" /></svg>
+                              </button>
+                              <button onClick={() => setDeletePhoto(photo)} className="bg-white rounded-full p-1 shadow hover:bg-red-100">
+                                {/* Trash icon */}
+                                <svg width="20" height="20" fill="none" viewBox="0 0 24 24" stroke="currentColor" className="text-red-600"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6M1 7h22M8 7V5a2 2 0 012-2h4a2 2 0 012 2v2" /></svg>
+                              </button>
+                            </div>
+                          </div>
+                        )}
                         <div className="p-3">
-                          <p className="text-sm text-gray-400 truncate">
-                            {photo.uploaderName || 'Anonymous'}
-                          </p>
                           {/* Photo comments */}
                           {photoComments.length > 0 && (
                             <div className="mt-2 space-y-1">
@@ -544,17 +586,6 @@ export default function ManagementPage() {
                               ))}
                             </div>
                           )}
-                        </div>
-                        {/* Edit/Delete icons */}
-                        <div className="absolute bottom-2 right-2 flex gap-2 opacity-80 group-hover:opacity-100">
-                          <button onClick={() => setEditPhoto(photo)} className="bg-white rounded-full p-1 shadow hover:bg-blue-100">
-                            {/* Edit icon (pencil) */}
-                            <svg width="20" height="20" fill="none" viewBox="0 0 24 24" stroke="currentColor" className="text-blue-600"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15.232 5.232l3.536 3.536M9 13l6.586-6.586a2 2 0 112.828 2.828L11.828 15.828a2 2 0 01-1.414.586H7v-3a2 2 0 01.586-1.414z" /></svg>
-                          </button>
-                          <button onClick={() => setDeletePhoto(photo)} className="bg-white rounded-full p-1 shadow hover:bg-red-100">
-                            {/* Trash icon */}
-                            <svg width="20" height="20" fill="none" viewBox="0 0 24 24" stroke="currentColor" className="text-red-600"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6M1 7h22M8 7V5a2 2 0 012-2h4a2 2 0 012 2v2" /></svg>
-                          </button>
                         </div>
                       </div>
                     )
@@ -598,7 +629,11 @@ export default function ManagementPage() {
                     <button className="bg-red-600 hover:bg-red-700 text-white px-4 py-2 rounded" disabled={deleting} onClick={async () => {
                       setDeleting(true)
                       try {
-                        await fetch(`/api/photos?id=${deletePhoto.id}`, { method: 'DELETE' })
+                        await fetch('/api/photos', {
+                          method: 'DELETE',
+                          headers: { 'Content-Type': 'application/json' },
+                          body: JSON.stringify({ id: deletePhoto.id })
+                        })
                         setPhotos(photos => photos.filter(p => p.id !== deletePhoto.id))
                         setDeletePhoto(null)
                       } finally {
@@ -837,6 +872,15 @@ export default function ManagementPage() {
               step={1}
               onChange={e => setEditEventScrollSpeed(Number(e.target.value))}
             />
+            <label className="block text-sm font-medium mb-2">Comment Style</label>
+            <select
+              className="w-full px-3 py-2 bg-white border border-gray-400 rounded text-gray-900 focus:outline-none focus:border-blue-500 mb-4"
+              value={editEventCommentStyle}
+              onChange={e => setEditEventCommentStyle(e.target.value as 'TICKER' | 'COMICBOOK')}
+            >
+              <option value="TICKER">Ticker (classic)</option>
+              <option value="COMICBOOK">Comic Book Bubbles</option>
+            </select>
             {!isScrollSpeedValid && <div className="text-red-500 text-xs mb-2">Scroll speed must be between 0 and 100.</div>}
             {editEventError && <div className="text-red-500 text-sm mb-4">{editEventError}</div>}
             <div className="flex justify-center gap-4 mt-4">
@@ -869,6 +913,60 @@ export default function ManagementPage() {
             setShowBulkUpload(false)
           }}
         />
+      )}
+
+      {/* QR Code - Lower Right Corner */}
+      {activeEventId && (
+        <div className="fixed bottom-4 right-4 z-40">
+          <QRCode 
+            photoId=""
+            eventId={activeEventId}
+            large={false}
+          />
+        </div>
+      )}
+
+      {/* New Event Modal */}
+      {showNewEventModal && (
+        <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50">
+          <div className="bg-white text-gray-900 rounded-xl p-8 w-full max-w-md mx-4 shadow-2xl border border-gray-200" onClick={e => e.stopPropagation()}>
+            <h2 className="text-2xl font-bold mb-6 text-center">Create New Event</h2>
+            <label className="block text-sm font-medium mb-2">Event Name</label>
+            <input
+              type="text"
+              className="w-full px-3 py-2 bg-white border border-gray-400 rounded text-gray-900 focus:outline-none focus:border-blue-500 mb-4"
+              value={newEventName}
+              onChange={e => setNewEventName(e.target.value)}
+              maxLength={100}
+            />
+            <label className="block text-sm font-medium mb-2">Comment Style</label>
+            <select
+              className="w-full px-3 py-2 bg-white border border-gray-400 rounded text-gray-900 focus:outline-none focus:border-blue-500 mb-4"
+              value={newEventCommentStyle}
+              onChange={e => setNewEventCommentStyle(e.target.value as 'TICKER' | 'COMICBOOK')}
+            >
+              <option value="TICKER">Ticker (classic)</option>
+              <option value="COMICBOOK">Comic Book Bubbles</option>
+            </select>
+            {newEventError && <div className="text-red-500 text-sm mb-4">{newEventError}</div>}
+            <div className="flex justify-center gap-4 mt-4">
+              <button
+                className="bg-blue-600 hover:bg-blue-700 text-white py-2 px-6 rounded font-medium transition"
+                onClick={handleCreateEvent}
+                disabled={creatingEvent || !newEventName.trim()}
+              >
+                {creatingEvent ? 'Creating...' : 'Create'}
+              </button>
+              <button
+                className="bg-gray-300 hover:bg-gray-400 text-gray-900 py-2 px-6 rounded font-medium transition"
+                onClick={() => setShowNewEventModal(false)}
+                disabled={creatingEvent}
+              >
+                Cancel
+              </button>
+            </div>
+          </div>
+        </div>
       )}
     </div>
   )

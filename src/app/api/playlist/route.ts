@@ -2,11 +2,11 @@ import { NextRequest, NextResponse } from 'next/server'
 import { prisma } from '@/lib/prisma'
 import crypto from 'crypto'
 
-import type { CommentStreamItem, Playlist, PhotoStreamItem } from '@/lib/slices/appSlice'
+import type { CommentStreamItem, PhotoStreamItem } from '@/lib/slices/appSlice'
 
 export type PlaylistResponse = {
   unchanged: boolean
-  playlist: Playlist | null
+  playlist: (Playlist & { commentStyle: 'TICKER' | 'COMICBOOK' }) | null
   hash: string
 }
 
@@ -96,10 +96,15 @@ export async function GET(req: NextRequest) {
         showTo: comment.showTo ? (comment.showTo instanceof Date ? comment.showTo.toISOString() : comment.showTo) : null
       }))
 
-    const playlist: Playlist = {
+    // Get the event to fetch commentStyle
+    const event = await prisma.socialEvent.findUnique({ where: { id: eventId } })
+    const commentStyle = event?.commentStyle || 'TICKER'
+
+    const playlist = {
       hash: '',
       photoStream: photoStream,
-      eventCommentStream: eventCommentStream
+      eventCommentStream: eventCommentStream,
+      commentStyle
     }
 
     // Generate MD5 hash of the playlist content

@@ -2,6 +2,7 @@
 
 import { useState } from 'react'
 import Spinner from '@/components/ui/Spinner'
+import { extractExifData, getLocationFromExif } from '@/lib/photoMeta'
 
 interface BulkUploadPopupProps {
   eventId: string
@@ -28,12 +29,9 @@ export default function BulkUploadPopup({ eventId, onClose, onUploadComplete }: 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault()
     
-    // Check if we have either text input or dropped files
-    const hasTextInput = fileList.trim().length > 0
     const hasDroppedFiles = droppedFiles.length > 0
-    
-    if (!hasTextInput && !hasDroppedFiles) {
-      setError('Please enter file paths or drop image files')
+    if (!hasDroppedFiles) {
+      setError('Please drop image files to upload')
       return
     }
 
@@ -64,14 +62,25 @@ export default function BulkUploadPopup({ eventId, onClose, onUploadComplete }: 
         setProgress(prev => prev ? { ...prev, currentFile: file.name } : null)
 
         try {
+          // Extract EXIF metadata and location
+          let dateTaken = ''
+          let location = ''
+          try {
+            const exifData = await extractExifData(file)
+            dateTaken = exifData.DateTimeOriginal?.description || ''
+            location = (await getLocationFromExif(exifData)) || ''
+          } catch (metaErr) {
+            console.warn('Could not extract EXIF/location:', metaErr)
+          }
+
           // Upload using FormData
           const formData = new FormData()
           formData.append('file', file)
           formData.append('eventId', eventId)
           formData.append('uploaderName', uploaderName)
           formData.append('comment', '')
-          formData.append('location', '')
-          formData.append('dateTaken', '')
+          formData.append('location', location)
+          formData.append('dateTaken', dateTaken)
 
           const uploadResponse = await fetch('/api/photos/upload', {
             method: 'POST',
@@ -90,73 +99,6 @@ export default function BulkUploadPopup({ eventId, onClose, onUploadComplete }: 
         }
 
         setProgress(prev => prev ? { ...prev, completed, failed } : null)
-      }
-    }
-
-    // Handle text input files
-    if (hasTextInput) {
-      // Parse file list (split by newlines and filter empty lines)
-      const textFiles = fileList.split('\n')
-        .map(line => line.trim())
-        .filter(line => line.length > 0)
-
-      if (textFiles.length > 0) {
-        totalFiles += textFiles.length
-        setProgress(prev => prev ? { ...prev, total: totalFiles } : null)
-
-        for (let i = 0; i < textFiles.length; i++) {
-          const filePath = textFiles[i]
-          setProgress(prev => prev ? { ...prev, currentFile: filePath } : null)
-
-          try {
-            // Try to fetch the file from the provided path
-            const response = await fetch(filePath)
-            if (!response.ok) {
-              console.error(`Failed to fetch ${filePath}: ${response.status}`)
-              failed++
-              continue
-            }
-
-            const blob = await response.blob()
-            
-            // Check if it's an image
-            if (!blob.type.startsWith('image/')) {
-              console.error(`${filePath} is not an image file`)
-              failed++
-              continue
-            }
-
-            // Create a file object
-            const fileName = filePath.split('/').pop() || 'image.jpg'
-            const file = new File([blob], fileName, { type: blob.type })
-
-            // Upload using FormData
-            const formData = new FormData()
-            formData.append('file', file)
-            formData.append('eventId', eventId)
-            formData.append('uploaderName', uploaderName)
-            formData.append('comment', '')
-            formData.append('location', '')
-            formData.append('dateTaken', '')
-
-            const uploadResponse = await fetch('/api/photos/upload', {
-              method: 'POST',
-              body: formData
-            })
-
-            if (uploadResponse.ok) {
-              completed++
-            } else {
-              console.error(`Upload failed for ${filePath}:`, await uploadResponse.text())
-              failed++
-            }
-          } catch (err) {
-            console.error(`Error processing ${filePath}:`, err)
-            failed++
-          }
-
-          setProgress(prev => prev ? { ...prev, completed, failed } : null)
-        }
       }
     }
 
@@ -284,22 +226,6 @@ export default function BulkUploadPopup({ eventId, onClose, onUploadComplete }: 
                 </div>
               )}
             </div>
-          </div>
-
-          <div className="mb-4">
-            <label className="block text-sm font-medium mb-2">
-              Or Enter File Paths (one per line)
-            </label>
-            <textarea
-              placeholder="Enter file paths, one per line:&#10;https://example.com/photo1.jpg&#10;https://example.com/photo2.jpg&#10;/path/to/local/file.jpg"
-              value={fileList}
-              onChange={e => setFileList(e.target.value)}
-              className="w-full h-32 px-3 py-2 border rounded resize-none"
-              disabled={isUploading}
-            />
-            <p className="text-xs text-gray-500 mt-1">
-              Supports HTTP URLs and local file paths
-            </p>
           </div>
 
           {progress && (

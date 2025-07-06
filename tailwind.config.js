@@ -10,6 +10,7 @@ module.exports = {
       fontFamily: {
         sans: ['var(--font-geist-sans)', 'Arial', 'sans-serif'],
         mono: ['var(--font-geist-mono)', 'monospace'],
+        comic: ['"Comic Neue"', 'cursive'],
       },
     },
   },

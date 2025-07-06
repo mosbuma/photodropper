@@ -39,12 +39,14 @@ export default function ActionPage() {
           >
             Upload Photo
           </button>
-          <button
-            className="w-full bg-green-600 hover:bg-green-700 text-white font-medium py-2 px-4 rounded"
-            onClick={() => setShowPhotoComment(true)}
-          >
-            Comment on Photo
-          </button>
+          {photoId && (
+            <button
+              className="w-full bg-green-600 hover:bg-green-700 text-white font-medium py-2 px-4 rounded"
+              onClick={() => setShowPhotoComment(true)}
+            >
+              Comment on Photo
+            </button>
+          )}
           <button
             className="w-full bg-yellow-600 hover:bg-yellow-700 text-white font-medium py-2 px-4 rounded"
             onClick={() => setShowEventComment(true)}

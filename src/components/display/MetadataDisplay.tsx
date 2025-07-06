@@ -41,7 +41,7 @@ export default function MetadataDisplay({ dateTaken, location }: MetadataDisplay
     return null
   }
 
-  const className='text-base font-bold bg-yellow-500 text-white flex items-center px-2 py-4 rounded-lg';
+  const className='text-base font-bold bg-yellow-500 text-white flex items-center justify-center text-center px-2 py-4 rounded-lg';
   const style={fontSize: '48px', minWidth: '250px', minHeight: '48px'};
 
   return (

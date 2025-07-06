@@ -7,9 +7,10 @@ import Spinner from '@/components/ui/Spinner'
 interface QRCodeProps {
   photoId: string
   eventId: string
+  large: boolean
 }
 
-export default function QRCode({ photoId, eventId }: QRCodeProps) {
+export default function QRCode({ photoId, eventId, large = true }: QRCodeProps) {
   const [localIp, setLocalIp] = useState<string | null>(null)
   const [loading, setLoading] = useState(true)
 
@@ -48,14 +49,10 @@ export default function QRCode({ photoId, eventId }: QRCodeProps) {
     <div className="bg-white p-2 rounded-lg shadow-lg cursor-pointer hover:shadow-xl transition-shadow" onClick={handleClick}>
       <QRCodeSVG 
         value={actionUrl}
-        size={256}
+        size={large ? 256: 128}
         level="L"
         includeMargin={true}
       />
-      <div className="text-center mt-2">
-        <p className="text-m font-bold text-black">DROP EEN FOTO</p>
-        <p className="text-m font-bold text-black">OF COMMENT</p>
-      </div>
     </div>
   )
 } 

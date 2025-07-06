@@ -4,6 +4,7 @@ export const socialEventSchema = z.object({
   name: z.string().min(1),
   photoDurationMs: z.number().int().min(1000).max(60000).default(5000),
   scrollSpeedPct: z.number().int().min(0).max(100).default(50),
+  commentStyle: z.enum(['TICKER', 'COMICBOOK']).default('TICKER'),
 })
 
 export const photoSchema = z.object({

@@ -1,7 +1,7 @@
 'use client'
 
 import { useRef, useState } from 'react'
-import ExifReader from 'exifreader'
+import { extractExifData, getLocationFromExif } from '@/lib/photoMeta'
 import Spinner from '@/components/ui/Spinner'
 import Image from 'next/image'
 
@@ -15,45 +15,6 @@ interface PhotoMeta {
   comment: string
   location: string
   date: string
-}
-
-// Extract EXIF data from file using exifreader
-export const extractExifData = async (file: File): Promise<ExifReader.Tags> => {
-    try {
-      const tags = await ExifReader.load(file);
-      return tags;
-    } catch (err) {
-      console.error('Error extracting EXIF:', err);
-      return {} as ExifReader.Tags;
-    }
-}
-
-
-// Lookup location name from lat/lng using Nominatim
-export async function getLocationFromExif(exifData: ExifReader.Tags): Promise<string | null> {
-  try {
-    console.log('*** [getLocationFromExif] exifData:', JSON.stringify(Object.keys(exifData), null, 2));
-    console.log('*** [getLocationFromExif] lat:', exifData.GPSLatitude?.description);
-    console.log('*** [getLocationFromExif] lng:', exifData.GPSLongitude?.description);
-    const lat = parseFloat(exifData.GPSLatitude?.description || '0')
-    const lng = parseFloat(exifData.GPSLongitude?.description || '0')
-
-    const url = `https://nominatim.openstreetmap.org/reverse?lat=${lat}&lon=${lng}&format=json`;
-    console.log(`*** [getLocationFromLatLng] calling ${url}`);
-    const response = await fetch(url, {
-      headers: { 'User-Agent': 'photodropper/1.0 (your@email.com)' }
-    });
-    if (!response.ok) return null;
-    const data = await response.json();
-    console.log('*** [getLocationFromExif] data:', data);
-    const address = data.address;
-    return (
-      address.city || address.town || address.village || address.hamlet || address.county || address.state || data.display_name || null
-    );
-  } catch (err) {
-    console.error('Error in getLocationFromLatLng:', err);
-    return "";
-  }
 }
 
 export default function UploadPhotoPopup({ eventId, onClose }: UploadPhotoPopupProps) {

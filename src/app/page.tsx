@@ -9,6 +9,8 @@ import ImageDisplay from '@/components/display/ImageDisplay'
 import QRCode from '@/components/display/QRCode'
 import MetadataDisplay from '@/components/display/MetadataDisplay'
 import Ticker from '@/components/display/Ticker'
+import PhotoCommentBox from '@/components/display/PhotoCommentBox'
+import EventCommentBubble from '@/components/display/EventCommentBubble'
 
 export default function Home() {
   const dispatch = useAppDispatch()
@@ -104,6 +106,16 @@ export default function Home() {
   const photoComments = currentPhoto?.comments || []
   const eventComments = currentPlaylist?.eventCommentStream || []
 
+  // Map comments to expected type for bubble components
+  const mappedPhotoComments = photoComments.map(c => ({
+    ...c,
+    commenterName: c.commenterName ?? undefined
+  }))
+  const mappedEventComments = eventComments.map(c => ({
+    ...c,
+    commenterName: c.commenterName ?? undefined
+  }))
+
   // console.log(`[Home] currentPlaylist: ${JSON.stringify(currentPlaylist, null, 2)}`)
   // console.log(`[Home] currentPhotoIndex: ${JSON.stringify(currentPhotoIndex, null, 2)}`)
   console.log(`[Home] showPasswordDialog: ${showPasswordDialog}`)
@@ -131,18 +143,59 @@ export default function Home() {
       </div>
 
       {/* Metadata - Top Right (only if photo) */}
-      <div className="absolute top-4 right-4 z-10">
-        <MetadataDisplay 
-          dateTaken={currentPhoto?.dateTaken || null}
-          location={currentPhoto?.location || null}
-        />
-      </div>
+      {currentPlaylist?.commentStyle === 'TICKER' && (
+        <div className="absolute top-4 right-4 z-10">
+          <MetadataDisplay 
+            dateTaken={currentPhoto?.dateTaken || null}
+            location={currentPhoto?.location || null}
+          />
+        </div>
+      )}
 
-      {/* Ticker - Bottom */}
-      <Ticker 
-        photoComments={photoComments}
-        eventComments={eventComments}
-      />
+      {/* Ticker or ComicBook Comments - Bottom */}
+      {currentPlaylist?.commentStyle === 'TICKER' ? (
+        <Ticker 
+          photoComments={photoComments}
+          eventComments={eventComments}
+        />
+      ) : (
+        <>
+          {/* Comic book style: location/date at top in yellow box */}
+          {((currentPhoto?.location && currentPhoto.location.trim()) || currentPhoto?.dateTaken) && (
+            <PhotoCommentBox
+              comment={[
+                currentPhoto?.location?.trim() || '',
+                currentPhoto?.dateTaken ? new Date(currentPhoto.dateTaken).toLocaleDateString() : ''
+              ].filter(Boolean).join(' \u2022 ')}
+              position="top"
+              color="yellow"
+              defaultFontSize={32}
+            />
+          )}
+          {/* Comic book style: photo comments at bottom, alternating color */}
+          {mappedPhotoComments.length > 0 && (
+            <PhotoCommentBox
+              comment={(() => {
+                // Cycle through comments as before
+                const idx = 0 // always show the first for now, or implement cycling if needed
+                const c = mappedPhotoComments[idx]
+                return c.commenterName ? `${c.comment}\n— ${c.commenterName}` : c.comment
+              })()}
+              color={(() => {
+                // Alternate color by comment index
+                const idx = 0 // always show the first for now, or implement cycling if needed
+                return idx % 2 === 0 ? 'yellow' : 'blue'
+              })()}
+              position="bottom"
+              defaultFontSize={44}
+            />
+          )}
+          {/* Comic book bubbles: event comments (no tail) */}
+          <div className="absolute left-0 top-0 w-full h-full border-2 border-white">
+            <EventCommentBubble comments={mappedEventComments} />
+          </div>
+        </>
+      )}
 
       { showPasswordDialog && <PasswordDialog onClose={handleClosePasswordDialog} /> }
     </div>

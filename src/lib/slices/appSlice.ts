@@ -41,6 +41,7 @@ export interface Playlist {
   hash: string
   photoStream: PhotoStreamItem[]
   eventCommentStream: CommentStreamItem[]
+  commentStyle: 'TICKER' | 'COMICBOOK'
 }
 
 interface AppState {

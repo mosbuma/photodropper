@@ -13,7 +13,8 @@ CREATE TABLE partydropper.social_events (
   created_at timestamptz NOT NULL DEFAULT now(),
   updated_at timestamptz NOT NULL DEFAULT now(),
   photo_duration_ms integer NOT NULL DEFAULT 5000,
-  scroll_speed_pct integer NOT NULL DEFAULT 50
+  scroll_speed_pct integer NOT NULL DEFAULT 50,
+  comment_style VARCHAR(16) NOT NULL DEFAULT 'TICKER'
 );
 
 -- Photo table

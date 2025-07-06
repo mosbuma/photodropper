@@ -5,4 +5,5 @@ export interface SocialEvent {
   updatedAt: string;
   photoDurationMs: number;
   scrollSpeedPct: number;
+  commentStyle: 'TICKER' | 'COMICBOOK';
 } 

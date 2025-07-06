@@ -23,6 +23,7 @@ model SocialEvent {
   updatedAt         DateTime  @default(now()) @updatedAt @map("updated_at") @db.Timestamptz
   photoDurationMs   Int       @default(5000) @map("photo_duration_ms")
   scrollSpeedPct    Int       @default(50) @map("scroll_speed_pct")
+  commentStyle      String    @default("TICKER") @map("comment_style") @db.VarChar(16)
 
   // Relations
   photos            Photo[]
