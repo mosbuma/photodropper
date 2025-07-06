@@ -46,8 +46,9 @@ export default function UploadPhotoPopup({ eventId, onClose }: UploadPhotoPopupP
     try {
       // Extract EXIF data
       const exifData = await extractExifData(f)
+      
 
-      const updatedMeta = { ...meta, date: exifData.DateTimeOriginal?.description || ''  }
+      const updatedMeta = { ...meta, date: exifData.createdAt?.description || exifData.DateTimeOriginal?.description || ''  }
 
       // Location from EXIF GPS (decimal)
       try {

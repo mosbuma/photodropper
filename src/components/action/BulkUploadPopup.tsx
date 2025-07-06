@@ -67,8 +67,8 @@ export default function BulkUploadPopup({ eventId, onClose, onUploadComplete }: 
           let location = ''
           try {
             const exifData = await extractExifData(file)
-            dateTaken = exifData.DateTimeOriginal?.description || ''
             location = (await getLocationFromExif(exifData)) || ''
+            dateTaken = exifData.DateTimeOriginal?.description || exifData.createdAt?.description || '';
           } catch (metaErr) {
             console.warn('Could not extract EXIF/location:', metaErr)
           }
