@@ -1,6 +1,6 @@
 'use client'
 
-import { useState, useEffect } from 'react'
+import { useState, useEffect, useMemo } from 'react'
 import { useRouter } from 'next/navigation'
 import { useSession, signIn } from 'next-auth/react'
 import { useAppSelector, useAppDispatch } from '@/lib/hooks'
@@ -8,6 +8,7 @@ import { setActiveEvent } from '@/lib/slices/appSlice'
 import { playlistManager } from '@/lib/playlistManager'
 import type { SocialEvent } from '@prisma/client'
 import type { CommentStreamItem, PhotoStreamItem } from '@/lib/slices/appSlice'
+import BulkUploadPopup from '@/components/action/BulkUploadPopup'
 
 export default function ManagementPage() {
   const router = useRouter()
@@ -25,9 +26,7 @@ export default function ManagementPage() {
   const [deleteEvent, setDeleteEvent] = useState<SocialEvent | null>(null)
   const [deleting, setDeleting] = useState(false)
   const [deletingEvent, setDeletingEvent] = useState(false)
-  const [importing, setImporting] = useState(false)
   const [cleaning, setCleaning] = useState(false)
-  const [creatingDemo, setCreatingDemo] = useState(false)
   const [cleanupSummary, setCleanupSummary] = useState<string | null>(null)
   const [editEvent, setEditEvent] = useState<SocialEvent | null>(null)
   const [editEventName, setEditEventName] = useState('')
@@ -35,14 +34,17 @@ export default function ManagementPage() {
   const [editEventError, setEditEventError] = useState<string | null>(null)
   const [editEventPhotoDuration, setEditEventPhotoDuration] = useState<number>(0)
   const [editEventScrollSpeed, setEditEventScrollSpeed] = useState<number>(0)
+  const [showBulkUpload, setShowBulkUpload] = useState(false)
 
-  const tabs = [
+  const tabs = useMemo(() => [
     { id: 'events', label: 'Events' },
-    { id: 'photos', label: 'Photos' },
-    { id: 'comments', label: 'Comments' },
-    { id: 'playlist', label: 'Playlist' },
+    ...(events.length > 0 ? [
+      { id: 'photos', label: 'Photos' },
+      { id: 'comments', label: 'Comments' },
+      { id: 'playlist', label: 'Playlist' }
+    ] : []),
     { id: 'settings', label: 'Settings' }
-  ]
+  ], [events.length])
 
   const handleClose = () => {
     router.push('/')
@@ -63,6 +65,8 @@ export default function ManagementPage() {
       if (response.ok) {
         const newEvent = await response.json()
         setEvents(prev => [...prev, newEvent])
+        // Immediately set the new event as active
+        dispatch(setActiveEvent(newEvent.id))
         alert('Event created successfully!')
       } else {
         alert('Failed to create event')
@@ -80,35 +84,12 @@ export default function ManagementPage() {
     alert(`Event ${eventId} set as active`)
   }
 
-  const handleImportPhotos = async () => {
+  const handleBulkUpload = () => {
     if (!activeEventId) {
       alert('Please select an event first')
       return
     }
-
-    try {
-      setImporting(true)
-      const response = await fetch('/api/photos/import', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ eventId: activeEventId })
-      })
-
-      if (response.ok) {
-        const result = await response.json()
-        alert(`Import completed! Found ${result.importedCount} images.`)
-        // Reload photos to show the imported ones
-        loadPhotos()
-      } else {
-        const error = await response.json()
-        alert(`Import failed: ${error.error}`)
-      }
-    } catch (error) {
-      console.error('Error importing photos:', error)
-      alert('Error importing photos')
-    } finally {
-      setImporting(false)
-    }
+    setShowBulkUpload(true)
   }
 
   const handleDeleteEvent = async () => {
@@ -177,191 +158,7 @@ export default function ManagementPage() {
     }
   }
 
-  const handleAddDemo = async () => {
-    try {
-      setCreatingDemo(true)
-      console.log('Starting demo creation...')
-      
-      // Create demo event
-      const timestamp = new Date().toISOString().replace(/[:.]/g, '-')
-      const eventName = `DEMO ${timestamp}`
-      
-      console.log('Creating event:', eventName)
-      
-      const eventResponse = await fetch('/api/social_events', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ name: eventName })
-      })
-      
-      console.log('Event response status:', eventResponse.status)
-      
-      if (!eventResponse.ok) {
-        const errorText = await eventResponse.text()
-        console.error('Event creation failed:', errorText)
-        throw new Error(`Failed to create event: ${errorText}`)
-      }
-      
-      const event = await eventResponse.json()
-      console.log('Event created:', event)
-      
-      // Upload demo photos
-      const demoPhotos = ['demo/DEMO-1.JPG', 'demo/DEMO-2.JPG', 'demo/DEMO-3.JPG', 'demo/DEMO-4.JPG', 'demo/DEMO-5.JPG']
-      const uploadedPhotos = []
-      
-      for (let i = 0; i < demoPhotos.length; i++) {
-        const photoName = demoPhotos[i]
-        console.log(`Uploading ${photoName}...`)
-        
-        try {
-          // Fetch the image from public folder
-          const imageResponse = await fetch(`/${photoName}`)
-          if (!imageResponse.ok) {
-            console.error(`Failed to fetch ${photoName}:`, imageResponse.status)
-            continue
-          }
-          
-          const imageBlob = await imageResponse.blob()
-          
-          // Create a file object
-          const file = new File([imageBlob], photoName, { type: 'image/jpeg' })
-          
-          // Upload using FormData
-          const formData = new FormData()
-          formData.append('file', file)
-          formData.append('eventId', event.id)
-          formData.append('uploaderName', 'Demo User')
-          formData.append('comment', `Demo photo ${i + 1}`)
-          formData.append('location', 'Demo Location')
-          formData.append('dateTaken', new Date().toISOString().split('T')[0])
-          
-          const photoResponse = await fetch('/api/photos/upload', {
-            method: 'POST',
-            body: formData
-          })
-          
-          console.log(`Photo upload response for ${photoName}:`, photoResponse.status)
-          
-          if (photoResponse.ok) {
-            const photo = await photoResponse.json()
-            console.log(`Photo uploaded:`, photo)
-            uploadedPhotos.push(photo.photo)
-          } else {
-            const errorText = await photoResponse.text()
-            console.error(`Photo upload failed for ${photoName}:`, errorText)
-          }
-        } catch (photoError) {
-          console.error(`Error uploading ${photoName}:`, photoError)
-        }
-      }
-      
-      console.log(`Successfully uploaded ${uploadedPhotos.length} photos`)
-      
-      // Add random comments to photos
-      const photoComments = [
-        "This is amazing! 📸",
-        "Love this moment! ❤️",
-        "Perfect shot! 👌",
-        "Memories forever! 🌟",
-        "What a great time! 🎉",
-        "This is so fun! 😄",
-        "Best photo ever! 🏆",
-        "Can't stop laughing! 😂",
-        "This is epic! 🔥",
-        "Pure joy! ✨"
-      ]
-      
-      for (const photo of uploadedPhotos) {
-        const numComments = Math.floor(Math.random() * 4) // 0-3 comments
-        console.log(`Adding ${numComments} comments to photo ${photo.id}`)
-        
-        for (let i = 0; i < numComments; i++) {
-          const randomComment = photoComments[Math.floor(Math.random() * photoComments.length)]
-          const commentData = {
-            eventId: event.id,
-            photoId: photo.id,
-            index: i,
-            comment: randomComment,
-            commenterName: `Guest${Math.floor(Math.random() * 100)}`,
-            visible: true
-          }
-          
-          try {
-            const commentResponse = await fetch('/api/comments', {
-              method: 'POST',
-              headers: { 'Content-Type': 'application/json' },
-              body: JSON.stringify(commentData)
-            })
-            
-            if (!commentResponse.ok) {
-              const errorText = await commentResponse.text()
-              console.error('Comment creation failed:', errorText)
-            }
-          } catch (commentError) {
-            console.error('Error creating comment:', commentError)
-          }
-        }
-      }
-      
-      // Add random event comments
-      const eventComments = [
-        "This party is incredible! 🎊",
-        "Best event ever! 🏆",
-        "Having so much fun! 😄",
-        "This is the place to be! 🌟",
-        "Amazing vibes here! ✨",
-        "Can't believe how awesome this is! 🔥",
-        "Everyone is so friendly! 🤗",
-        "This is what memories are made of! 💫",
-        "Absolutely loving this! ❤️",
-        "What a fantastic time! 🎉"
-      ]
-      
-      const numEventComments = Math.floor(Math.random() * 4) // 0-3 comments
-      console.log(`Adding ${numEventComments} event comments`)
-      
-      for (let i = 0; i < numEventComments; i++) {
-        const randomComment = eventComments[Math.floor(Math.random() * eventComments.length)]
-        const commentData = {
-          eventId: event.id,
-          index: i,
-          comment: randomComment,
-          commenterName: `EventGuest${Math.floor(Math.random() * 100)}`,
-          visible: true
-        }
-        
-        try {
-          const commentResponse = await fetch('/api/comments', {
-            method: 'POST',
-            headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify(commentData)
-          })
-          
-          if (!commentResponse.ok) {
-            const errorText = await commentResponse.text()
-            console.error('Event comment creation failed:', errorText)
-          }
-        } catch (commentError) {
-          console.error('Error creating event comment:', commentError)
-        }
-      }
-      
-      // Set as active event
-      dispatch(setActiveEvent(event.id))
-      
-      // Reload events to show the new demo event
-      loadEvents()
-      
-      alert(`Demo created successfully! Event ID: ${event.id}`)
-      
-    } catch (error) {
-      console.error('Demo creation failed:', error)
-      const errorMessage = error instanceof Error ? error.message : 'Unknown error occurred'
-      alert(`Failed to create demo: ${errorMessage}`)
-    } finally {
-      setCreatingDemo(false)
-    }
-  }
+
 
   const loadEvents = async () => {
     try {
@@ -425,6 +222,14 @@ export default function ManagementPage() {
       loadComments()
     }
   }
+
+  // Switch to events tab if current tab becomes unavailable
+  useEffect(() => {
+    const availableTabs = tabs.map(tab => tab.id)
+    if (!availableTabs.includes(activeTab)) {
+      setActiveTab('events')
+    }
+  }, [events.length, activeTab, tabs])
 
   // Check authentication
   useEffect(() => {
@@ -517,7 +322,7 @@ export default function ManagementPage() {
         const error = await response.json()
         setEditEventError(error.error || 'Failed to update event')
       }
-    } catch (err) {
+    } catch {
       setEditEventError('Failed to update event')
     } finally {
       setSavingEvent(false)
@@ -575,13 +380,7 @@ export default function ManagementPage() {
                 New Event
               </button>
               
-              <button
-                onClick={handleAddDemo}
-                disabled={creatingDemo}
-                className="bg-purple-600 hover:bg-purple-700 disabled:bg-gray-600 px-4 py-2 rounded"
-              >
-                {creatingDemo ? 'Creating Demo...' : 'ADD DEMO'}
-              </button>
+
               
               <select 
                 value={activeEventId || ''} 
@@ -640,40 +439,56 @@ export default function ManagementPage() {
         {!loading && activeTab === 'events' && (
           <div className="space-y-4">
             <h2 className="text-xl font-semibold mb-4">Events</h2>
-            <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-3">
-              {events.map((event: SocialEvent) => (
-                <div key={event.id} className="bg-gray-800 rounded-lg p-4 border border-gray-700">
-                  <div className="flex items-center justify-between mb-2">
-                    <h3 className="font-medium">{event.name}</h3>
-                    <div className="flex space-x-2">
-                      <button
-                        onClick={() => handleSetActiveEvent(event.id)}
-                        className="text-blue-400 hover:text-blue-300 text-sm"
-                      >
-                        Set Active
-                      </button>
-                      <button className="text-gray-400 hover:text-gray-300 text-sm" onClick={() => handleEditEvent(event)}>
-                        Edit
-                      </button>
-                      <button
-                        onClick={() => setDeleteEvent(event)}
-                        className="text-red-400 hover:text-red-300 text-sm"
-                      >
-                        Delete
-                      </button>
+            {events.length > 0 ? (
+              <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-3">
+                {events.map((event: SocialEvent) => (
+                  <div key={event.id} className="bg-gray-800 rounded-lg p-4 border border-gray-700">
+                    <div className="flex items-center justify-between mb-2">
+                      <h3 className="font-medium">{event.name}</h3>
+                      <div className="flex space-x-2">
+                        <button
+                          onClick={() => handleSetActiveEvent(event.id)}
+                          className="text-blue-400 hover:text-blue-300 text-sm"
+                        >
+                          Set Active
+                        </button>
+                        <button className="text-gray-400 hover:text-gray-300 text-sm" onClick={() => handleEditEvent(event)}>
+                          Edit
+                        </button>
+                        <button
+                          onClick={() => setDeleteEvent(event)}
+                          className="text-red-400 hover:text-red-300 text-sm"
+                        >
+                          Delete
+                        </button>
+                      </div>
                     </div>
+                    <p className="text-sm text-gray-400">
+                      Created: {new Date(event.createdAt).toLocaleDateString()}
+                    </p>
+                    {activeEventId === event.id && (
+                      <span className="inline-block bg-green-600 text-white text-xs px-2 py-1 rounded mt-2">
+                        Active
+                      </span>
+                    )}
                   </div>
-                  <p className="text-sm text-gray-400">
-                    Created: {new Date(event.createdAt).toLocaleDateString()}
-                  </p>
-                  {activeEventId === event.id && (
-                    <span className="inline-block bg-green-600 text-white text-xs px-2 py-1 rounded mt-2">
-                      Active
-                    </span>
-                  )}
+                ))}
+              </div>
+            ) : (
+              <div className="text-center py-12">
+                <div className="bg-gray-800 rounded-lg p-8 border border-gray-700">
+                  <h3 className="text-lg font-medium text-gray-300 mb-2">No events yet</h3>
+                  <p className="text-gray-400 mb-4">Create your first event to start</p>
+                  <button
+                    onClick={handleNewEvent}
+                    disabled={loading}
+                    className="bg-blue-600 hover:bg-blue-700 disabled:bg-gray-600 px-6 py-2 rounded"
+                  >
+                    Create Event
+                  </button>
                 </div>
-              ))}
-            </div>
+              </div>
+            )}
           </div>
         )}
 
@@ -682,74 +497,83 @@ export default function ManagementPage() {
             <div className="flex items-center justify-between">
               <h2 className="text-xl font-semibold">Photos</h2>
               <div className="flex space-x-2">
-                <button 
-                  onClick={handleImportPhotos}
-                  disabled={importing || !activeEventId}
-                  className="bg-green-600 hover:bg-green-700 disabled:bg-gray-600 px-4 py-2 rounded"
-                >
-                  {importing ? 'Importing...' : 'Import Photos'}
-                </button>
-                <button 
-                  onClick={handleCleanupPhotos}
-                  disabled={cleaning}
-                  className="bg-orange-600 hover:bg-orange-700 disabled:bg-gray-600 px-4 py-2 rounded"
-                >
-                  {cleaning ? 'Cleaning...' : 'Cleanup Files'}
-                </button>
+                {activeEventId && (
+                  <button 
+                    onClick={handleBulkUpload}
+                    className="bg-green-600 hover:bg-green-700 px-4 py-2 rounded"
+                  >
+                    Bulk Upload
+                  </button>
+                )}
               </div>
             </div>
             {activeEventId ? (
-              <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4">
-                {photos.map((photo) => {
-                  // Filter comments for this specific photo
-                  const photoComments = comments.filter(
-                    (comment) => comment.photoId && String(comment.photoId) === String(photo.id)
-                  );
-                  
-                  // Debug logging
-                  console.log(`Photo ${photo.id}:`, photoComments.length, 'comments')
-                  if (photoComments.length > 0) {
-                    console.log('Photo comments:', photoComments.map(c => ({ id: c.id, comment: c.comment, photoId: c.photoId })))
-                  }
-                  
-                  return (
-                    <div key={photo.id} className="bg-gray-800 rounded-lg overflow-hidden relative group">
-                      {/* eslint-disable-next-line @next/next/no-img-element */}
-                      <img 
-                        src={photo.photoUrl} 
-                        alt="Photo"
-                        className="w-full h-48 object-cover"
-                      />
-                      <div className="p-3">
-                        <p className="text-sm text-gray-400 truncate">
-                          {photo.uploaderName || 'Anonymous'}
-                        </p>
-                        {/* Photo comments */}
-                        {photoComments.length > 0 && (
-                          <div className="mt-2 space-y-1">
-                            {photoComments.map((comment) => (
-                              <p key={comment.id} className="text-xs text-gray-500">
-                                {comment.comment}
-                              </p>
-                            ))}
-                          </div>
-                        )}
+              photos.length > 0 ? (
+                <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4">
+                  {photos.map((photo) => {
+                    // Filter comments for this specific photo
+                    const photoComments = comments.filter(
+                      (comment) => comment.photoId && String(comment.photoId) === String(photo.id)
+                    );
+                    
+                    // Debug logging
+                    console.log(`Photo ${photo.id}:`, photoComments.length, 'comments')
+                    if (photoComments.length > 0) {
+                      console.log('Photo comments:', photoComments.map(c => ({ id: c.id, comment: c.comment, photoId: c.photoId })))
+                    }
+                    
+                    return (
+                      <div key={photo.id} className="bg-gray-800 rounded-lg overflow-hidden relative group">
+                        {/* eslint-disable-next-line @next/next/no-img-element */}
+                        <img 
+                          src={photo.photoUrl} 
+                          alt="Photo"
+                          className="w-full h-48 object-cover"
+                        />
+                        <div className="p-3">
+                          <p className="text-sm text-gray-400 truncate">
+                            {photo.uploaderName || 'Anonymous'}
+                          </p>
+                          {/* Photo comments */}
+                          {photoComments.length > 0 && (
+                            <div className="mt-2 space-y-1">
+                              {photoComments.map((comment) => (
+                                <p key={comment.id} className="text-xs text-gray-500">
+                                  {comment.comment}
+                                </p>
+                              ))}
+                            </div>
+                          )}
+                        </div>
+                        {/* Edit/Delete icons */}
+                        <div className="absolute bottom-2 right-2 flex gap-2 opacity-80 group-hover:opacity-100">
+                          <button onClick={() => setEditPhoto(photo)} className="bg-white rounded-full p-1 shadow hover:bg-blue-100">
+                            {/* Edit icon (pencil) */}
+                            <svg width="20" height="20" fill="none" viewBox="0 0 24 24" stroke="currentColor" className="text-blue-600"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15.232 5.232l3.536 3.536M9 13l6.586-6.586a2 2 0 112.828 2.828L11.828 15.828a2 2 0 01-1.414.586H7v-3a2 2 0 01.586-1.414z" /></svg>
+                          </button>
+                          <button onClick={() => setDeletePhoto(photo)} className="bg-white rounded-full p-1 shadow hover:bg-red-100">
+                            {/* Trash icon */}
+                            <svg width="20" height="20" fill="none" viewBox="0 0 24 24" stroke="currentColor" className="text-red-600"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6M1 7h22M8 7V5a2 2 0 012-2h4a2 2 0 012 2v2" /></svg>
+                          </button>
+                        </div>
                       </div>
-                      {/* Edit/Delete icons */}
-                      <div className="absolute bottom-2 right-2 flex gap-2 opacity-80 group-hover:opacity-100">
-                        <button onClick={() => setEditPhoto(photo)} className="bg-white rounded-full p-1 shadow hover:bg-blue-100">
-                          {/* Edit icon (pencil) */}
-                          <svg width="20" height="20" fill="none" viewBox="0 0 24 24" stroke="currentColor" className="text-blue-600"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15.232 5.232l3.536 3.536M9 13l6.586-6.586a2 2 0 112.828 2.828L11.828 15.828a2 2 0 01-1.414.586H7v-3a2 2 0 01.586-1.414z" /></svg>
-                        </button>
-                        <button onClick={() => setDeletePhoto(photo)} className="bg-white rounded-full p-1 shadow hover:bg-red-100">
-                          {/* Trash icon */}
-                          <svg width="20" height="20" fill="none" viewBox="0 0 24 24" stroke="currentColor" className="text-red-600"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6M1 7h22M8 7V5a2 2 0 012-2h4a2 2 0 012 2v2" /></svg>
-                        </button>
-                      </div>
-                    </div>
-                  )
-                })}
-              </div>
+                    )
+                  })}
+                </div>
+              ) : (
+                <div className="text-center py-12">
+                  <div className="bg-gray-800 rounded-lg p-8 border border-gray-700">
+                    <h3 className="text-lg font-medium text-gray-300 mb-2">No photos yet</h3>
+                    <p className="text-gray-400 mb-4">Add photos to this event</p>
+                    <button
+                      onClick={handleBulkUpload}
+                      className="bg-green-600 hover:bg-green-700 px-6 py-2 rounded"
+                    >
+                      Bulk Upload
+                    </button>
+                  </div>
+                </div>
+              )
             ) : (
               <p className="text-gray-400">Select an event to view photos</p>
             )}
@@ -916,7 +740,21 @@ export default function ManagementPage() {
         {!loading && activeTab === 'settings' && (
           <div className="space-y-4">
             <h2 className="text-xl font-semibold">Settings</h2>
-            <p className="text-gray-400">Settings configuration coming soon...</p>
+            <div className="space-y-4">
+              <div className="bg-gray-800 rounded-lg p-4 border border-gray-700">
+                <h3 className="text-lg font-medium mb-2">File Management</h3>
+                <p className="text-sm text-gray-400 mb-4">
+                  Clean up orphaned photo files that are not linked to any event.
+                </p>
+                <button 
+                  onClick={handleCleanupPhotos}
+                  disabled={cleaning}
+                  className="bg-orange-600 hover:bg-orange-700 disabled:bg-gray-600 px-4 py-2 rounded"
+                >
+                  {cleaning ? 'Cleaning...' : 'Cleanup Files'}
+                </button>
+              </div>
+            </div>
           </div>
         )}
       </div>
@@ -928,7 +766,7 @@ export default function ManagementPage() {
             <button className="absolute top-2 right-2 text-gray-500" onClick={() => setDeleteEvent(null)}>&times;</button>
             <h2 className="text-xl font-bold mb-4">Delete Event?</h2>
             <p className="mb-4">
-              Are you sure you want to delete the event "<strong>{deleteEvent.name}</strong>"?
+              Are you sure you want to delete the event &quot;<strong>{deleteEvent.name}</strong>&quot;?
             </p>
             <p className="mb-4 text-sm text-gray-600">
               This will also delete all associated photos, comments, and photo files on disk.
@@ -1019,6 +857,18 @@ export default function ManagementPage() {
             </div>
           </div>
         </div>
+      )}
+
+      {/* Bulk Upload Popup */}
+      {showBulkUpload && activeEventId && (
+        <BulkUploadPopup
+          eventId={activeEventId}
+          onClose={() => setShowBulkUpload(false)}
+          onUploadComplete={() => {
+            loadPhotos()
+            setShowBulkUpload(false)
+          }}
+        />
       )}
     </div>
   )
