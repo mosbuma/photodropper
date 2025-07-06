@@ -2,7 +2,7 @@ import { NextRequest, NextResponse } from 'next/server'
 import { prisma } from '@/lib/prisma'
 import crypto from 'crypto'
 
-import type { CommentStreamItem, PhotoStreamItem } from '@/lib/slices/appSlice'
+import type { CommentStreamItem, PhotoStreamItem, Playlist } from '@/lib/slices/appSlice'
 
 export type PlaylistResponse = {
   unchanged: boolean

@@ -139,6 +139,7 @@ export default function Home() {
         <QRCode 
           photoId={currentPhoto?.photoId || ''}
           eventId={activeEventId || ''}
+          large={true}
         />
       </div>
 
