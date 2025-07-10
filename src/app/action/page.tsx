@@ -144,6 +144,7 @@ export default function ActionPage() {
       {/* Background photo display */}
       {photo?.photoUrl && (
         <div className="absolute inset-0 bg-black">
+          { /* eslint-disable-next-line @next/next/no-img-element */}
           <img
             src={photo.photoUrl}
             alt="Background photo"

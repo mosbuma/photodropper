@@ -31,4 +31,31 @@ export async function getLocationFromExif(exifData: ExifReader.Tags): Promise<st
     console.error('Error in getLocationFromLatLng:', err);
     return null;
   }
+}
+
+// Utility for comment display throttling
+const COMMENT_SHOWN_KEY = 'photodropper_comment_last_shown';
+const COMMENT_MIN_INTERVAL_MS = 2 * 60 * 1000; // 2 minutes
+
+export function canShowComment(commentId: string): boolean {
+  if (typeof window === 'undefined') return true;
+  const raw = localStorage.getItem(COMMENT_SHOWN_KEY);
+  let stats: Record<string, number> = {};
+  if (raw) {
+    try { stats = JSON.parse(raw); } catch {}
+  }
+  const now = Date.now();
+  const last = stats[commentId] || 0;
+  return now - last > COMMENT_MIN_INTERVAL_MS;
+}
+
+export function markCommentShown(commentId: string) {
+  if (typeof window === 'undefined') return;
+  const raw = localStorage.getItem(COMMENT_SHOWN_KEY);
+  let stats: Record<string, number> = {};
+  if (raw) {
+    try { stats = JSON.parse(raw); } catch {}
+  }
+  stats[commentId] = Date.now();
+  localStorage.setItem(COMMENT_SHOWN_KEY, JSON.stringify(stats));
 } 

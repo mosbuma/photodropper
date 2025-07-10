@@ -18,7 +18,6 @@ export default function PhotoCommentBox({ comment, position = 'bottom', color = 
     const textEl = textRef.current
     let size = defaultFontSize
     const minSize = 10
-    const maxSize = 56
     textEl.style.fontSize = `${size}px`
     textEl.style.lineHeight = '1.1'
     textEl.style.wordBreak = 'break-word'

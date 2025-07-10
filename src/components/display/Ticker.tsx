@@ -2,6 +2,7 @@
 
 import TickerRow from './TickerRow'
 import type { CommentStreamItem } from '@/lib/slices/appSlice'
+import { canShowComment, markCommentShown } from '@/lib/photoMeta';
 
 interface TickerProps {
   photoComments: CommentStreamItem[]
@@ -9,8 +10,16 @@ interface TickerProps {
 }
 
 export default function Ticker({ photoComments, eventComments }: TickerProps) {
-  const hasPhotoComments = photoComments.length > 0
-  const hasEventComments = eventComments.length > 0
+  // Filter comments to only those that can be shown
+  const filteredPhotoComments = photoComments.filter(c => canShowComment(c.id));
+  const filteredEventComments = eventComments.filter(c => canShowComment(c.id));
+
+  // Mark as shown when rendering
+  filteredPhotoComments.forEach(c => markCommentShown(c.id));
+  filteredEventComments.forEach(c => markCommentShown(c.id));
+
+  const hasPhotoComments = filteredPhotoComments.length > 0
+  const hasEventComments = filteredEventComments.length > 0
 
   const photoTickerScrollSpeed = 75
   const eventTickerScrollSpeed = 25
@@ -27,7 +36,7 @@ export default function Ticker({ photoComments, eventComments }: TickerProps) {
         {hasPhotoComments && (
           <div>
             <TickerRow 
-              comments={photoComments}
+              comments={filteredPhotoComments}
               scrollSpeed={photoTickerScrollSpeed}
               className="text-base bg-blue-900 text-white p-4 font-bold"
               extraStyle={{
@@ -39,7 +48,7 @@ export default function Ticker({ photoComments, eventComments }: TickerProps) {
         {hasEventComments && (
           <div>
             <TickerRow 
-              comments={eventComments}
+              comments={filteredEventComments}
               scrollSpeed={eventTickerScrollSpeed}
               className="text-base bg-white text-black p-4 font-bold"
               extraStyle={{

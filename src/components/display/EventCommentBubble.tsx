@@ -1,5 +1,6 @@
 import React, { useEffect, useState } from 'react'
 import BaseBubble from './BaseBubble'
+import { canShowComment, markCommentShown } from '@/lib/photoMeta';
 
 const NO_TAIL_IMAGES = [
   '/balloons/BUBBLE-NO-TAIL.png',
@@ -17,6 +18,8 @@ interface EventCommentBubbleProps {
 }
 
 export default function EventCommentBubble({ comments, intervalMs = 4000 }: EventCommentBubbleProps) {
+  const filteredComments = comments.filter(c => typeof c.id === 'string' ? canShowComment(c.id) : true);
+  filteredComments.forEach(c => { if (typeof c.id === 'string') markCommentShown(c.id); });
   const [index, setIndex] = useState(0)
   const [fade, setFade] = useState<'in' | 'out'>('in')
   const [bubbleStyle, setBubbleStyle] = useState(NO_TAIL_IMAGES[0])
@@ -34,7 +37,6 @@ export default function EventCommentBubble({ comments, intervalMs = 4000 }: Even
     } else {
       // Pick a left% in 75-100%, but clamp so bubble doesn't overflow
       // Convert percent to px, clamp, then convert back to %
-      const minLeftPx = 0
       const maxLeftPx = viewportWidth - bubbleWidthPx - marginPx
       const randomPx = maxLeftPx + Math.random() * (viewportWidth - maxLeftPx - bubbleWidthPx)
       left = (randomPx / viewportWidth) * 100
@@ -48,27 +50,27 @@ export default function EventCommentBubble({ comments, intervalMs = 4000 }: Even
 
   // Loop through comments with fade in/out
   useEffect(() => {
-    if (!comments.length) return
+    if (!filteredComments.length) return
     setFade('in')
     const showTimer = setTimeout(() => setFade('out'), intervalMs - 700)
     const nextTimer = setTimeout(() => {
-      setIndex(i => (i + 1) % comments.length)
+      setIndex(i => (i + 1) % filteredComments.length)
       setBubbleStyle(NO_TAIL_IMAGES[Math.floor(Math.random() * NO_TAIL_IMAGES.length)])
       setPosition(generateRandomPosition())
       setFade('in')
     }, intervalMs)
     return () => { clearTimeout(showTimer); clearTimeout(nextTimer) }
-  }, [index, comments, intervalMs])
+  }, [index, filteredComments, intervalMs])
 
   // Set initial position
   useEffect(() => {
-    if (comments.length > 0) {
+    if (filteredComments.length > 0) {
       setPosition(generateRandomPosition())
     }
-  }, [comments.length])
+  }, [filteredComments.length])
 
-  if (!comments.length) return null
-  const comment = comments[index]
+  if (!filteredComments.length) return null
+  const comment = filteredComments[index]
   const text = comment.commenterName ? `${comment.comment}\n— ${comment.commenterName}` : comment.comment
 
   return (
