@@ -21,12 +21,14 @@ export default function Home() {
     currentPlaylistHash
   } = useAppSelector(state => state.app)
   const [showPasswordDialog, setShowPasswordDialog] = useState(false)
+  const [isLoading, setIsLoading] = useState(false)
 
   // Reset app state when switching events
   const prevEventIdRef = useRef<string | null>(null)
   useEffect(() => {
     if (prevEventIdRef.current !== null && prevEventIdRef.current !== activeEventId) {
       dispatch(resetApp())
+      setIsLoading(true)
     }
     prevEventIdRef.current = activeEventId
   }, [activeEventId, dispatch])
@@ -47,6 +49,7 @@ export default function Home() {
     console.log(`[Home] useEffect activeEventId: ${activeEventId}`)
     if (activeEventId) {
       console.log(`[Home] Starting playlist polling for event ${activeEventId} with hash ${currentPlaylistHash}`) 
+      setIsLoading(true)
       playlistManager.startPolling(activeEventId, currentPlaylistHash)
     } else {
       console.log(`[Home] Stopping playlist polling`)
@@ -59,6 +62,13 @@ export default function Home() {
       playlistManager.stopPolling()
     }
   }, [activeEventId, currentPlaylistHash])
+
+  // Clear loading state when photos are loaded
+  useEffect(() => {
+    if (hasPhotos) {
+      setIsLoading(false)
+    }
+  }, [hasPhotos])
 
   // Check if active event still exists
   useEffect(() => {
@@ -122,6 +132,16 @@ export default function Home() {
 
   return (
     <div className="min-h-screen bg-black relative overflow-hidden" onClick={handlePageClick}>
+      {/* Loading indicator */}
+      {isLoading && activeEventId && (
+        <div className="absolute inset-0 bg-black bg-opacity-75 flex items-center justify-center z-50">
+          <div className="text-white text-center">
+            <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-white mx-auto mb-4"></div>
+            <p className="text-lg">Loading photos...</p>
+          </div>
+        </div>
+      )}
+
       {/* Main Photo Display or Placeholder */}
       {currentPhoto?.photoUrl ? (
         <ImageDisplay />

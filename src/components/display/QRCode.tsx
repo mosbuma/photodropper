@@ -11,32 +11,49 @@ interface QRCodeProps {
 }
 
 export default function QRCode({ photoId, eventId, large = true }: QRCodeProps) {
-  const [localIp, setLocalIp] = useState<string | null>(null)
+  const [baseUrl, setBaseUrl] = useState<string | null>(null)
   const [loading, setLoading] = useState(true)
 
   useEffect(() => {
-    async function fetchIp() {
+    async function fetchBaseUrl() {
       try {
         const res = await fetch('/api/local-ip')
         if (res.ok) {
           const data = await res.json()
-          setLocalIp('http://' + data.localIp + ':3000')
+          // The API now returns either a full URL (production) or just an IP (development)
+          const url = data.localIp
+          if (url && url.startsWith('http')) {
+            // Production: API returned full URL
+            setBaseUrl(url)
+          } else if (url) {
+            // Development: API returned just IP, construct full URL
+            setBaseUrl(`http://${url}:3000`)
+          } else {
+            // Fallback to window.location.origin
+            setBaseUrl(typeof window !== 'undefined' ? window.location.origin : '')
+          }
+        } else {
+          // API failed, fallback to window.location.origin
+          setBaseUrl(typeof window !== 'undefined' ? window.location.origin : '')
         }
-      } catch {
-        // ignore
+      } catch (error) {
+        console.error('Error fetching base URL:', error)
+        // Fallback to window.location.origin if API fails
+        setBaseUrl(typeof window !== 'undefined' ? window.location.origin : '')
       } finally {
         setLoading(false)
       }
     }
-    fetchIp()
+    fetchBaseUrl()
   }, [])
 
-  const origin = localIp || (typeof window !== 'undefined' ? window.location.origin : '')
-  const actionUrl = `${origin}/action?event=${eventId}&photo=${photoId || ''}`
+  const actionUrl = baseUrl ? `${baseUrl}/action?event=${eventId}&photo=${photoId || ''}` : ''
 
   const handleClick = () => {
     // Open action page in new tab when QR code is clicked
-    window.open(actionUrl, '_blank')
+    if (actionUrl) {
+      window.open(actionUrl, '_blank')
+    }
   }
 
   if (loading) {

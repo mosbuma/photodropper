@@ -8,6 +8,8 @@ class PlaylistManager {
   private currentEventId: string | null = null
   private currentHash: string = ''
   private isInitialized: boolean = false
+  private pollCount: number = 0
+  private isInitialPolling: boolean = false
 
   private constructor() {}
 
@@ -22,6 +24,11 @@ class PlaylistManager {
     // Update current event and hash
     this.currentEventId = eventId
     this.currentHash = hash
+    this.pollCount = 0
+    this.isInitialPolling = true
+
+    // Make immediate API call to get current playlist
+    this.pollPlaylist()
 
     // Start polling if not already initialized
     if (!this.isInitialized) {
@@ -34,6 +41,8 @@ class PlaylistManager {
     // Don't actually stop polling, just clear the current event
     this.currentEventId = null
     this.currentHash = ''
+    this.isInitialPolling = false
+    this.pollCount = 0
   }
 
   private scheduleNextPoll() {
@@ -41,10 +50,16 @@ class PlaylistManager {
 
     // Get polling interval from environment variable, default to 5000ms (5 seconds)
     const pollIntervalMs = parseInt(process.env.NEXT_PUBLIC_PLAYLIST_POLL_INTERVAL_MS || '5000')
+    
+    // Use faster polling for the first few calls (1 second intervals)
+    let nextPollDelay = pollIntervalMs
+    if (this.isInitialPolling && this.pollCount < 3) {
+      nextPollDelay = 1000 // 1 second for first 3 polls
+    }
 
     this.timeoutId = window.setTimeout(() => {
       this.pollPlaylist()
-    }, pollIntervalMs)
+    }, nextPollDelay)
   }
 
   private async pollPlaylist() {
@@ -64,12 +79,20 @@ class PlaylistManager {
             store.dispatch(setCurrentPlaylist(data.playlist))
             store.dispatch(setCurrentPlaylistHash(data.hash)) // Store hash as version
             this.currentHash = data.hash
+            
+            // If we got photos and this was initial polling, switch to normal interval
+            if (this.isInitialPolling && data.playlist.photoStream.length > 0) {
+              this.isInitialPolling = false
+            }
           }
         }
       } catch (error) {
         console.error('[PlaylistManager] Error polling playlist:', error)
       }
     }
+
+    // Increment poll count
+    this.pollCount++
 
     // Always schedule the next poll
     this.scheduleNextPoll()
