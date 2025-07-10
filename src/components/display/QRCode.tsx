@@ -49,7 +49,10 @@ export default function QRCode({ photoId, eventId, large = true }: QRCodeProps) 
 
   const actionUrl = baseUrl ? `${baseUrl}/action?event=${eventId}&photo=${photoId || ''}` : ''
 
-  const handleClick = () => {
+  const handleClick = (e: React.MouseEvent) => {
+    // Prevent event propagation to parent
+    e.stopPropagation()
+    
     // Open action page in new tab when QR code is clicked
     if (actionUrl) {
       window.open(actionUrl, '_blank')

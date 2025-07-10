@@ -1,6 +1,7 @@
 'use client'
 
 import { useState, useEffect, useRef } from 'react'
+import { useSearchParams } from 'next/navigation'
 import { useAppSelector, useAppDispatch } from '@/lib/hooks'
 import { setActiveEvent, resetApp, setCurrentPhotoIndex } from '@/lib/slices/appSlice'
 import { playlistManager } from '@/lib/playlistManager'
@@ -14,6 +15,7 @@ import EventCommentBubble from '@/components/display/EventCommentBubble'
 
 export default function Home() {
   const dispatch = useAppDispatch()
+  const searchParams = useSearchParams()
   const { 
     activeEventId, 
     currentPhotoIndex, 
@@ -22,6 +24,15 @@ export default function Home() {
   } = useAppSelector(state => state.app)
   const [showPasswordDialog, setShowPasswordDialog] = useState(false)
   const [isLoading, setIsLoading] = useState(false)
+
+  // Handle URL parameters for event selection
+  useEffect(() => {
+    const eventParam = searchParams.get('event')
+    if (eventParam && eventParam !== activeEventId) {
+      console.log(`[Home] Setting active event from URL parameter: ${eventParam}`)
+      dispatch(setActiveEvent(eventParam))
+    }
+  }, [searchParams, activeEventId, dispatch])
 
   // Reset app state when switching events
   const prevEventIdRef = useRef<string | null>(null)
@@ -69,6 +80,25 @@ export default function Home() {
       setIsLoading(false)
     }
   }, [hasPhotos])
+
+  // Clear loading state when playlist is loaded (even if empty)
+  useEffect(() => {
+    if (currentPlaylist !== null) {
+      setIsLoading(false)
+    }
+  }, [currentPlaylist])
+
+  // Fallback: clear loading state after timeout
+  useEffect(() => {
+    if (isLoading && activeEventId) {
+      const timeout = setTimeout(() => {
+        console.log('[Home] Loading timeout reached, clearing loading state')
+        setIsLoading(false)
+      }, 10000) // 10 second timeout
+      
+      return () => clearTimeout(timeout)
+    }
+  }, [isLoading, activeEventId])
 
   // Check if active event still exists
   useEffect(() => {
@@ -137,7 +167,7 @@ export default function Home() {
         <div className="absolute inset-0 bg-black bg-opacity-75 flex items-center justify-center z-50">
           <div className="text-white text-center">
             <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-white mx-auto mb-4"></div>
-            <p className="text-lg">Loading photos...</p>
+            <p className="text-lg">Loading event...</p>
           </div>
         </div>
       )}

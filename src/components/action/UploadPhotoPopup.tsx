@@ -7,6 +7,7 @@ import Image from 'next/image'
 
 interface UploadPhotoPopupProps {
   eventId: string
+  eventName?: string
   onClose: () => void
 }
 
@@ -17,7 +18,7 @@ interface PhotoMeta {
   date: string
 }
 
-export default function UploadPhotoPopup({ eventId, onClose }: UploadPhotoPopupProps) {
+export default function UploadPhotoPopup({ eventId, eventName, onClose }: UploadPhotoPopupProps) {
   const fileInputRef = useRef<HTMLInputElement>(null)
   const [step, setStep] = useState<'select' | 'uploading' | 'done'>('select')
   const [file, setFile] = useState<File | null>(null)
@@ -120,7 +121,9 @@ export default function UploadPhotoPopup({ eventId, onClose }: UploadPhotoPopupP
     <div className="fixed inset-0 bg-black bg-opacity-70 flex items-center justify-center z-50">
       <div className="bg-white text-black rounded-lg p-6 w-full max-w-sm relative">
         <button className="absolute top-2 right-2 text-gray-500" onClick={onClose}>&times;</button>
-        <h2 className="text-xl font-bold mb-4">Upload a Photo</h2>
+        <h2 className="text-xl font-bold mb-4">
+          Upload a Photo{eventName ? ` to ${eventName}` : ''}
+        </h2>
         {/* Image area with upload button if no image selected */}
         <div className="mb-4 rounded max-h-40 mx-auto relative w-full h-40 flex items-center justify-center bg-gray-100">
           {photoUrl ? (
@@ -197,6 +200,12 @@ export default function UploadPhotoPopup({ eventId, onClose }: UploadPhotoPopupP
           <div className="flex flex-col items-center justify-center min-h-[100px] mt-4">
             <Spinner size="lg" className="mb-4" />
             <p>Processing photo...</p>
+          </div>
+        )}
+        {step === 'done' && (
+          <div className="flex flex-col items-center justify-center min-h-[100px] mt-4">
+            <div className="text-green-600 text-4xl mb-2">✓</div>
+            <p>Photo uploaded successfully!</p>
           </div>
         )}
       </div>
