@@ -4,13 +4,14 @@ import { prisma } from '@/lib/prisma'
 // GET: Fetch a single social event by ID
 export async function GET(
   req: NextRequest,
-  { params }: { params: { id: string } }
+  { params }: { params: Promise<{ id: string }> }
 ) {
   try {
-    console.log(`GET /api/social_events/${params.id} called`)
+    const { id } = await params
+    console.log(`GET /api/social_events/${id} called`)
     
     const event = await prisma.socialEvent.findUnique({
-      where: { id: params.id }
+      where: { id }
     })
     
     if (!event) {
