@@ -54,6 +54,7 @@ export default function ActionPage() {
   const [photo, setPhoto] = useState<Photo | null>(null)
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState<string | null>(null)
+  const [eventSettings, setEventSettings] = useState<{ enablePhotoComments?: boolean; enableEventComments?: boolean }>({});
 
   // Fetch event details
   useEffect(() => {
@@ -103,6 +104,21 @@ export default function ActionPage() {
 
     fetchPhoto()
   }, [photoId])
+
+  // Fetch event settings on mount or when eventId changes
+  useEffect(() => {
+    if (!eventId) return;
+    fetch(`/api/social_events?id=${eventId}`)
+      .then(res => res.ok ? res.json() : null)
+      .then(data => {
+        if (data && data[0]) {
+          setEventSettings({
+            enablePhotoComments: data[0].enablePhotoComments,
+            enableEventComments: data[0].enableEventComments,
+          });
+        }
+      });
+  }, [eventId]);
 
   if (!eventId) {
     return (
@@ -171,7 +187,7 @@ export default function ActionPage() {
               <span className="text-sm font-medium">Upload</span>
             </button>
 
-            {photoId && (
+            {photoId && eventSettings.enablePhotoComments !== false && (
               <button
                 className="flex flex-col items-center justify-center bg-gray-600 hover:bg-gray-700 text-white w-32 h-32 rounded-lg transition-colors"
                 onClick={() => setShowPhotoComment(true)}
@@ -183,15 +199,17 @@ export default function ActionPage() {
               </button>
             )}
 
-            <button
-              className="flex flex-col items-center justify-center bg-gray-600 hover:bg-gray-700 text-white w-32 h-32 rounded-lg transition-colors"
-              onClick={() => setShowEventComment(true)}
-            >
-              <svg className="w-8 h-8 mb-2" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M8 12h.01M12 12h.01M16 12h.01M21 12c0 4.418-4.03 8-9 8a9.863 9.863 0 01-4.255-.949L3 20l1.395-3.72C3.512 15.042 3 13.574 3 12c0-4.418 4.03-8 9-8s9 3.582 9 8z" />
-              </svg>
-              <span className="text-sm font-medium">Event Comment</span>
-            </button>
+            {eventSettings.enableEventComments && (
+              <button
+                className="flex flex-col items-center justify-center bg-gray-600 hover:bg-gray-700 text-white w-32 h-32 rounded-lg transition-colors"
+                onClick={() => setShowEventComment(true)}
+              >
+                <svg className="w-8 h-8 mb-2" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M8 12h.01M12 12h.01M16 12h.01M21 12c0 4.418-4.03 8-9 8a9.863 9.863 0 01-4.255-.949L3 20l1.395-3.72C3.512 15.042 3 13.574 3 12c0-4.418 4.03-8 9-8s9 3.582 9 8z" />
+                </svg>
+                <span className="text-sm font-medium">Event Comment</span>
+              </button>
+            )}
           </div>
 
           {showUpload && (

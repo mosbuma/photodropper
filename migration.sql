@@ -17,3 +17,7 @@ ALTER TABLE partydropper.photos RENAME COLUMN date_taken_text TO date_taken;
 
 -- Add a comment to document the change
 COMMENT ON COLUMN partydropper.photos.date_taken IS 'Date taken stored as text to support various formats including EXIF'; 
+
+-- Add enable_photo_comments and enable_event_comments to social_events
+ALTER TABLE partydropper.social_events ADD COLUMN enable_photo_comments boolean NOT NULL DEFAULT true;
+ALTER TABLE partydropper.social_events ADD COLUMN enable_event_comments boolean NOT NULL DEFAULT false; 

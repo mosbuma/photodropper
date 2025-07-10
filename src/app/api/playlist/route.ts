@@ -2,7 +2,7 @@ import { NextRequest, NextResponse } from 'next/server'
 import { prisma } from '@/lib/prisma'
 import crypto from 'crypto'
 
-import type { CommentStreamItem, PhotoStreamItem, Playlist } from '@/lib/slices/appSlice'
+import type { PhotoStreamItem } from '@/lib/slices/appSlice'
 
 export type PlaylistResponse = {
   unchanged: boolean
@@ -20,6 +20,14 @@ export async function GET(req: NextRequest) {
   }
 
   try {
+    // Fetch the event to get its settings
+    const event = await prisma.socialEvent.findUnique({ where: { id: eventId } });
+    if (!event) {
+      return NextResponse.json({ error: 'Event not found' }, { status: 404 });
+    }
+    const enablePhotoComments = event.enablePhotoComments ?? true;
+    const enableEventComments = event.enableEventComments ?? false;
+
     // Get photos for the event
     const photos = await prisma.photo.findMany({
       where: {
@@ -57,9 +65,29 @@ export async function GET(req: NextRequest) {
       lastShown: photo.lastShown ? (photo.lastShown instanceof Date ? photo.lastShown.toISOString() : photo.lastShown) : null,
       showFrom: photo.showFrom ? (photo.showFrom instanceof Date ? photo.showFrom.toISOString() : photo.showFrom) : null,
       showTo: photo.showTo ? (photo.showTo instanceof Date ? photo.showTo.toISOString() : photo.showTo) : null,
-      comments: comments
-        .filter(comment => comment.photoId === photo.id)
-        .map(comment => ({
+      comments: enablePhotoComments
+        ? comments.filter(comment => comment.photoId === photo.id).map(comment => ({
+            id: comment.id,
+            eventId: comment.eventId,
+            photoId: comment.photoId,
+            index: comment.index,
+            comment: comment.comment,
+            commenterName: comment.commenterName,
+            visible: comment.visible,
+            createdAt: comment.createdAt ? (comment.createdAt instanceof Date ? comment.createdAt.toISOString() : comment.createdAt) : null,
+            updatedAt: comment.updatedAt ? (comment.updatedAt instanceof Date ? comment.updatedAt.toISOString() : comment.updatedAt) : null,
+            scheduleCount: comment.scheduleCount,
+            showCount: comment.showCount,
+            lastShown: comment.lastShown ? (comment.lastShown instanceof Date ? comment.lastShown.toISOString() : comment.lastShown) : null,
+            showFrom: comment.showFrom ? (comment.showFrom instanceof Date ? comment.showFrom.toISOString() : comment.showFrom) : null,
+            showTo: comment.showTo ? (comment.showTo instanceof Date ? comment.showTo.toISOString() : comment.showTo) : null
+          }))
+        : []
+    }))
+
+    // For event comments:
+    const eventCommentStream = enableEventComments
+      ? comments.filter(comment => !comment.photoId).map(comment => ({
           id: comment.id,
           eventId: comment.eventId,
           photoId: comment.photoId,
@@ -75,29 +103,9 @@ export async function GET(req: NextRequest) {
           showFrom: comment.showFrom ? (comment.showFrom instanceof Date ? comment.showFrom.toISOString() : comment.showFrom) : null,
           showTo: comment.showTo ? (comment.showTo instanceof Date ? comment.showTo.toISOString() : comment.showTo) : null
         }))
-    }))
-
-    const eventCommentStream: CommentStreamItem[] = comments
-      .filter(comment => !comment.photoId)
-      .map(comment => ({
-        id: comment.id,
-        eventId: comment.eventId,
-        photoId: comment.photoId,
-        index: comment.index,
-        comment: comment.comment,
-        commenterName: comment.commenterName,
-        visible: comment.visible,
-        createdAt: comment.createdAt ? (comment.createdAt instanceof Date ? comment.createdAt.toISOString() : comment.createdAt) : null,
-        updatedAt: comment.updatedAt ? (comment.updatedAt instanceof Date ? comment.updatedAt.toISOString() : comment.updatedAt) : null,
-        scheduleCount: comment.scheduleCount,
-        showCount: comment.showCount,
-        lastShown: comment.lastShown ? (comment.lastShown instanceof Date ? comment.lastShown.toISOString() : comment.lastShown) : null,
-        showFrom: comment.showFrom ? (comment.showFrom instanceof Date ? comment.showFrom.toISOString() : comment.showFrom) : null,
-        showTo: comment.showTo ? (comment.showTo instanceof Date ? comment.showTo.toISOString() : comment.showTo) : null
-      }))
+      : [];
 
     // Get the event to fetch commentStyle
-    const event = await prisma.socialEvent.findUnique({ where: { id: eventId } })
     const commentStyle = event?.commentStyle || 'TICKER'
 
     const playlist = {

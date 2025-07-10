@@ -43,6 +43,13 @@ export default function ManagementPage() {
   const [creatingEvent, setCreatingEvent] = useState(false)
   const [newEventError, setNewEventError] = useState<string | null>(null)
 
+  // State for new event
+  const [newEventEnablePhotoComments, setNewEventEnablePhotoComments] = useState(true);
+  const [newEventEnableEventComments, setNewEventEnableEventComments] = useState(false);
+  // State for edit event
+  const [editEventEnablePhotoComments, setEditEventEnablePhotoComments] = useState(true);
+  const [editEventEnableEventComments, setEditEventEnableEventComments] = useState(false);
+
   const tabs = useMemo(() => [
     { id: 'events', label: 'Events' },
     ...(events.length > 0 ? [
@@ -62,6 +69,8 @@ export default function ManagementPage() {
     setNewEventName('')
     setNewEventCommentStyle('TICKER')
     setNewEventError(null)
+    setNewEventEnablePhotoComments(true)
+    setNewEventEnableEventComments(false)
   }
 
   const handleCreateEvent = async () => {
@@ -75,7 +84,12 @@ export default function ManagementPage() {
       const response = await fetch('/api/social_events', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ name: newEventName, commentStyle: newEventCommentStyle })
+        body: JSON.stringify({
+          name: newEventName,
+          commentStyle: newEventCommentStyle,
+          enablePhotoComments: newEventEnablePhotoComments,
+          enableEventComments: newEventEnableEventComments
+        })
       })
       if (response.ok) {
         const newEvent = await response.json()
@@ -311,6 +325,8 @@ export default function ManagementPage() {
     setEditEventScrollSpeed(event.scrollSpeedPct || 0)
     setEditEventCommentStyle((event.commentStyle as 'TICKER' | 'COMICBOOK') || 'TICKER')
     setEditEventError(null)
+    setEditEventEnablePhotoComments(event.enablePhotoComments ?? true)
+    setEditEventEnableEventComments(event.enableEventComments ?? false)
   }
 
   const handleSaveEditEvent = async () => {
@@ -327,6 +343,8 @@ export default function ManagementPage() {
           photoDurationMs: editEventPhotoDuration,
           scrollSpeedPct: editEventScrollSpeed,
           commentStyle: editEventCommentStyle,
+          enablePhotoComments: editEventEnablePhotoComments,
+          enableEventComments: editEventEnableEventComments
         })
       })
       if (response.ok) {
@@ -900,6 +918,14 @@ export default function ManagementPage() {
             </select>
             {!isScrollSpeedValid && <div className="text-red-500 text-xs mb-2">Scroll speed must be between 0 and 100.</div>}
             {editEventError && <div className="text-red-500 text-sm mb-4">{editEventError}</div>}
+            <label className="block text-sm font-medium mb-2">
+              <input type="checkbox" className="mr-2" checked={editEventEnablePhotoComments} onChange={e => setEditEventEnablePhotoComments(e.target.checked)} />
+              Enable Photo Comments
+            </label>
+            <label className="block text-sm font-medium mb-2">
+              <input type="checkbox" className="mr-2" checked={editEventEnableEventComments} onChange={e => setEditEventEnableEventComments(e.target.checked)} />
+              Enable Event Comments
+            </label>
             <div className="flex justify-center gap-4 mt-4">
               <button
                 className="bg-blue-600 hover:bg-blue-700 text-white py-2 px-6 rounded font-medium transition"
@@ -966,6 +992,14 @@ export default function ManagementPage() {
               <option value="COMICBOOK">Comic Book Bubbles</option>
             </select>
             {newEventError && <div className="text-red-500 text-sm mb-4">{newEventError}</div>}
+            <label className="block text-sm font-medium mb-2">
+              <input type="checkbox" className="mr-2" checked={newEventEnablePhotoComments} onChange={e => setNewEventEnablePhotoComments(e.target.checked)} />
+              Enable Photo Comments
+            </label>
+            <label className="block text-sm font-medium mb-2">
+              <input type="checkbox" className="mr-2" checked={newEventEnableEventComments} onChange={e => setNewEventEnableEventComments(e.target.checked)} />
+              Enable Event Comments
+            </label>
             <div className="flex justify-center gap-4 mt-4">
               <button
                 className="bg-blue-600 hover:bg-blue-700 text-white py-2 px-6 rounded font-medium transition"
