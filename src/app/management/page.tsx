@@ -545,36 +545,34 @@ export default function ManagementPage() {
                           alt="Photo"
                           className="w-full h-48 object-cover"
                         />
-                        {(photo.uploaderName || photo.location || photo.dateTaken) && (
-                          <div className="flex flex-row flex-wrap gap-2 justify-center items-center mt-1 mb-1 w-full">
-                            {photo.uploaderName && (
-                              <span className="inline-block bg-green-200 text-black text-xs font-semibold px-2 py-0.5 rounded border border-black shadow-sm">
-                                {photo.uploaderName}
-                              </span>
-                            )}
-                            {photo.location && (
-                              <span className="inline-block bg-yellow-200 text-black text-xs font-semibold px-2 py-0.5 rounded border border-black shadow-sm">
-                                {photo.location}
-                              </span>
-                            )}
-                            {photo.dateTaken && (
-                              <span className="inline-block bg-blue-200 text-black text-xs font-semibold px-2 py-0.5 rounded border border-black shadow-sm">
-                                {new Date(photo.dateTaken).toLocaleDateString()}
-                              </span>
-                            )}
-                            {/* Action buttons (edit/delete) */}
-                            <div className="flex gap-2 items-center ml-auto">
-                              <button onClick={() => setEditPhoto(photo)} className="bg-white rounded-full p-1 shadow hover:bg-blue-100">
-                                {/* Edit icon (pencil) */}
-                                <svg width="20" height="20" fill="none" viewBox="0 0 24 24" stroke="currentColor" className="text-blue-600"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15.232 5.232l3.536 3.536M9 13l6.586-6.586a2 2 0 112.828 2.828L11.828 15.828a2 2 0 01-1.414.586H7v-3a2 2 0 01.586-1.414z" /></svg>
-                              </button>
-                              <button onClick={() => setDeletePhoto(photo)} className="bg-white rounded-full p-1 shadow hover:bg-red-100">
-                                {/* Trash icon */}
-                                <svg width="20" height="20" fill="none" viewBox="0 0 24 24" stroke="currentColor" className="text-red-600"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6M1 7h22M8 7V5a2 2 0 012-2h4a2 2 0 012 2v2" /></svg>
-                              </button>
-                            </div>
+                        <div className="flex flex-row flex-wrap gap-2 justify-center items-center mt-1 mb-1 w-full">
+                          {photo.uploaderName && (
+                            <span className="inline-block bg-green-200 text-black text-xs font-semibold px-2 py-0.5 rounded border border-black shadow-sm">
+                              {photo.uploaderName}
+                            </span>
+                          )}
+                          {photo.location && (
+                            <span className="inline-block bg-yellow-200 text-black text-xs font-semibold px-2 py-0.5 rounded border border-black shadow-sm">
+                              {photo.location}
+                            </span>
+                          )}
+                          {photo.dateTaken && (
+                            <span className="inline-block bg-blue-200 text-black text-xs font-semibold px-2 py-0.5 rounded border border-black shadow-sm">
+                              {photo.dateTaken}
+                            </span>
+                          )}
+                          {/* Always show action buttons */}
+                          <div className="flex gap-2 items-center ml-auto">
+                            <button onClick={() => setEditPhoto(photo)} className="bg-white rounded-full p-1 shadow hover:bg-blue-100">
+                              {/* Edit icon (pencil) */}
+                              <svg width="20" height="20" fill="none" viewBox="0 0 24 24" stroke="currentColor" className="text-blue-600"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15.232 5.232l3.536 3.536M9 13l6.586-6.586a2 2 0 112.828 2.828L11.828 15.828a2 2 0 01-1.414.586H7v-3a2 2 0 01.586-1.414z" /></svg>
+                            </button>
+                            <button onClick={() => setDeletePhoto(photo)} className="bg-white rounded-full p-1 shadow hover:bg-red-100">
+                              {/* Trash icon */}
+                              <svg width="20" height="20" fill="none" viewBox="0 0 24 24" stroke="currentColor" className="text-red-600"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6M1 7h22M8 7V5a2 2 0 012-2h4a2 2 0 012 2v2" /></svg>
+                            </button>
                           </div>
-                        )}
+                        </div>
                         <div className="p-3">
                           {/* Photo comments */}
                           {photoComments.length > 0 && (
@@ -701,12 +699,31 @@ export default function ManagementPage() {
                       const created = photo.dateTaken;
                       let createdDisplay = '';
                       if (created) {
-                        const d = new Date(created);
-                        const now = new Date();
-                        const isToday = d.toDateString() === now.toDateString();
-                        createdDisplay = isToday
-                          ? d.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })
-                          : d.toLocaleString();
+                        // Try to parse the date string
+                        let date: Date | null = null
+                        try {
+                          date = new Date(created)
+                          if (isNaN(date.getTime())) {
+                            // Try EXIF format
+                            const exifMatch = created.match(/^(\d{4}):(\d{2}):(\d{2})(?:\s+(\d{2}):(\d{2}):(\d{2}))?$/)
+                            if (exifMatch) {
+                              const [, year, month, day, hour = '00', minute = '00', second = '00'] = exifMatch
+                              date = new Date(parseInt(year), parseInt(month) - 1, parseInt(day), parseInt(hour), parseInt(minute), parseInt(second))
+                            }
+                          }
+                        } catch (e) {
+                          console.error('Error parsing date:', e)
+                        }
+                        
+                        if (date && !isNaN(date.getTime())) {
+                          const now = new Date();
+                          const isToday = date.toDateString() === now.toDateString();
+                          createdDisplay = isToday
+                            ? date.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })
+                            : date.toLocaleString();
+                        } else {
+                          createdDisplay = created; // Show raw string if can't parse
+                        }
                       }
                       return (
                         <tr key={photo.photoId} className="border-b border-gray-700">
@@ -975,9 +992,9 @@ export default function ManagementPage() {
 // Add PhotoEditPopup component inline for now
 function PhotoEditPopup({ photo, onClose, onSave }: { photo: PhotoStreamItem, onClose: () => void, onSave: (updated: PhotoStreamItem) => void }) {
   const [meta, setMeta] = useState({
-                uploaderName: photo.uploaderName || '',
+    uploaderName: photo.uploaderName || '',
     location: photo.location || '',
-          dateTaken: photo.dateTaken ? photo.dateTaken.slice(0, 10) : '',
+    dateTaken: photo.dateTaken || '',
     visible: photo.visible,
   })
   const [saving, setSaving] = useState(false)

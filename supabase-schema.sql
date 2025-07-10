@@ -24,7 +24,7 @@ CREATE TABLE partydropper.photos (
   index integer NOT NULL,
   photo_url text NOT NULL,
   uploader_name text,
-  date_taken date,
+  date_taken text,
   coordinates text,
   location text,
   visible boolean NOT NULL DEFAULT false,

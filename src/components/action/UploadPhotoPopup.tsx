@@ -47,9 +47,15 @@ export default function UploadPhotoPopup({ eventId, eventName, onClose }: Upload
     try {
       // Extract EXIF data
       const exifData = await extractExifData(f)
+      console.log('EXIF data:', exifData)
       
 
       const updatedMeta = { ...meta, date: exifData.createdAt?.description || exifData.DateTimeOriginal?.description || ''  }
+      console.log('Date from EXIF:', {
+        createdAt: exifData.createdAt?.description,
+        DateTimeOriginal: exifData.DateTimeOriginal?.description,
+        finalDate: updatedMeta.date
+      })
 
       // Location from EXIF GPS (decimal)
       try {
@@ -92,6 +98,8 @@ export default function UploadPhotoPopup({ eventId, eventName, onClose }: Upload
       formData.append('comment', meta.comment)
       formData.append('location', meta.location)
       formData.append('dateTaken', meta.date)
+
+      console.log('Submitting form with dateTaken:', meta.date)
 
       // Upload to backend
       const response = await fetch('/api/photos/upload', {

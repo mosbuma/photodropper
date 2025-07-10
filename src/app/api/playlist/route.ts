@@ -46,7 +46,7 @@ export async function GET(req: NextRequest) {
       index: photo.index,
       photoUrl: photo.photoUrl,
       uploaderName: photo.uploaderName,
-      dateTaken: photo.dateTaken ? (photo.dateTaken instanceof Date ? photo.dateTaken.toISOString() : photo.dateTaken) : null,
+      dateTaken: photo.dateTaken,
       coordinates: photo.coordinates,
       location: photo.location,
       visible: photo.visible,

@@ -1,15 +1,19 @@
--- Migration: Add commentStyle to social_events table
--- Run this to update your existing database
+-- Migration to change date_taken from date to text
+-- This preserves existing data while changing the column type
 
--- Add the comment_style column to the social_events table with a default value
-ALTER TABLE partydropper.social_events 
-ADD COLUMN comment_style VARCHAR(16) NOT NULL DEFAULT 'TICKER';
+-- First, add the new column
+ALTER TABLE partydropper.photos ADD COLUMN date_taken_text text;
 
--- Update existing events to have the default comment style
--- (This is optional since we set a default, but ensures consistency)
-UPDATE partydropper.social_events 
-SET comment_style = 'TICKER' 
-WHERE comment_style IS NULL;
+-- Copy existing date data to the new column (convert date to text format)
+UPDATE partydropper.photos 
+SET date_taken_text = date_taken::text 
+WHERE date_taken IS NOT NULL;
 
--- Verify the migration
-SELECT id, name, comment_style FROM partydropper.social_events LIMIT 5; 
+-- Drop the old column
+ALTER TABLE partydropper.photos DROP COLUMN date_taken;
+
+-- Rename the new column to the original name
+ALTER TABLE partydropper.photos RENAME COLUMN date_taken_text TO date_taken;
+
+-- Add a comment to document the change
+COMMENT ON COLUMN partydropper.photos.date_taken IS 'Date taken stored as text to support various formats including EXIF'; 

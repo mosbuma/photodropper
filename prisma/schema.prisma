@@ -39,7 +39,7 @@ model Photo {
   index         Int
   photoUrl      String    @map("photo_url")
   uploaderName  String?   @map("uploader_name")
-  dateTaken     DateTime? @map("date_taken") @db.Date
+  dateTaken     String?   @map("date_taken")
   coordinates   String?
   location      String?
   visible       Boolean   @default(false)

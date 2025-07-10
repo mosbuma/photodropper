@@ -216,7 +216,7 @@ export default function Home() {
             <PhotoCommentBox
               comment={[
                 currentPhoto?.location?.trim() || '',
-                currentPhoto?.dateTaken ? new Date(currentPhoto.dateTaken).toLocaleDateString() : ''
+                currentPhoto?.dateTaken || ''
               ].filter(Boolean).join(' \u2022 ')}
               position="top"
               color="yellow"

@@ -9,7 +9,26 @@ export default function MetadataDisplay({ dateTaken, location }: MetadataDisplay
   const formatDate = (dateString?: string) => {
     if (!dateString) return null
     
-    const date = new Date(dateString)
+    // Try to parse the date string - it could be in various formats
+    let date: Date | null = null
+    
+    // Try parsing as ISO string first
+    date = new Date(dateString)
+    if (!isNaN(date.getTime())) {
+      // Valid date
+    } else {
+      // Try parsing EXIF format (YYYY:MM:DD HH:mm:ss)
+      const exifMatch = dateString.match(/^(\d{4}):(\d{2}):(\d{2})(?:\s+(\d{2}):(\d{2}):(\d{2}))?$/)
+      if (exifMatch) {
+        const [, year, month, day, hour = '00', minute = '00', second = '00'] = exifMatch
+        date = new Date(parseInt(year), parseInt(month) - 1, parseInt(day), parseInt(hour), parseInt(minute), parseInt(second))
+      }
+    }
+    
+    if (!date || isNaN(date.getTime())) {
+      return null
+    }
+    
     const now = new Date()
     const diffTime = Math.abs(now.getTime() - date.getTime())
     const diffDays = Math.ceil(diffTime / (1000 * 60 * 60 * 24))
@@ -46,12 +65,16 @@ export default function MetadataDisplay({ dateTaken, location }: MetadataDisplay
 
   return (
     <div key="metadata" className="flex flex-col gap-2">
-      <div key="date" className={`${className} ${formattedDate ? 'visible' : 'invisible'}`} style={style}>
-        {formattedDate || 'XXXX'}
-      </div>
-      <div key="location" className={`${className} ${location ? 'visible' : 'invisible'}`} style={style}>
-        {location || 'XXXX'}
-      </div>
+      {formattedDate && (
+        <div key="date" className={className} style={style}>
+          {formattedDate}
+        </div>
+      )}
+      {location && (
+        <div key="location" className={className} style={style}>
+          {location}
+        </div>
+      )}
     </div>
   )
 } 
