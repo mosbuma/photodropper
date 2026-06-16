@@ -1,88 +1,75 @@
-// This is your Prisma schema file,
-// learn more about it in the docs: https://pris.ly/d/prisma-schema
-
-// Looking for ways to speed up your queries, or scale easily with your serverless or edge functions?
-// Try Prisma Accelerate: https://pris.ly/cli/accelerate-init
-
 generator client {
   provider = "prisma-client-js"
-  previewFeatures = ["multiSchema"]
 }
 
 datasource db {
-  provider = "postgresql"
+  provider = "mysql"
   url      = env("DATABASE_URL")
-  directUrl = env("DIRECT_URL")
-  schemas  = ["partydropper"]
 }
 
 model SocialEvent {
-  id                String    @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
-  name              String
-  createdAt         DateTime  @default(now()) @map("created_at") @db.Timestamptz
-  updatedAt         DateTime  @default(now()) @updatedAt @map("updated_at") @db.Timestamptz
-  photoDurationMs   Int       @default(5000) @map("photo_duration_ms")
-  scrollSpeedPct    Int       @default(50) @map("scroll_speed_pct")
-  commentStyle      String    @default("TICKER") @map("comment_style") @db.VarChar(16)
-  enablePhotoComments Boolean @default(true) @map("enable_photo_comments")
-  enableEventComments Boolean @default(false) @map("enable_event_comments")
+  id                  String   @id @default(uuid()) @db.VarChar(36)
+  name                String
+  createdAt           DateTime @default(now()) @map("created_at") @db.DateTime(3)
+  updatedAt           DateTime @default(now()) @updatedAt @map("updated_at") @db.DateTime(3)
+  photoDurationMs     Int      @default(5000) @map("photo_duration_ms")
+  scrollSpeedPct      Int      @default(50) @map("scroll_speed_pct")
+  commentStyle        String   @default("TICKER") @map("comment_style") @db.VarChar(16)
+  enablePhotoComments Boolean  @default(true) @map("enable_photo_comments")
+  enableEventComments Boolean  @default(false) @map("enable_event_comments")
 
-  // Relations
-  photos            Photo[]
-  comments          Comment[]
+  photos   Photo[]
+  comments Comment[]
 
-  @@schema("partydropper")
   @@map("social_events")
 }
 
 model Photo {
-  id            String    @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
-  eventId       String    @map("event_id") @db.Uuid
+  id            String    @id @default(uuid()) @db.VarChar(36)
+  eventId       String    @map("event_id") @db.VarChar(36)
   index         Int
-  photoUrl      String    @map("photo_url")
-  uploaderName  String?   @map("uploader_name")
-  dateTaken     String?   @map("date_taken")
-  coordinates   String?
-  location      String?
+  photoUrl      String    @map("photo_url") @db.VarChar(2048)
+  uploaderName  String?   @map("uploader_name") @db.VarChar(255)
+  dateTaken     String?   @map("date_taken") @db.VarChar(64)
+  coordinates   String?   @db.VarChar(64)
+  location      String?   @db.Text
   visible       Boolean   @default(false)
-  createdAt     DateTime  @default(now()) @map("created_at") @db.Timestamptz
-  updatedAt     DateTime  @default(now()) @updatedAt @map("updated_at") @db.Timestamptz
+  createdAt     DateTime  @default(now()) @map("created_at") @db.DateTime(3)
+  updatedAt     DateTime  @default(now()) @updatedAt @map("updated_at") @db.DateTime(3)
   scheduleCount Int       @default(0) @map("schedule_count")
   showCount     Int       @default(0) @map("show_count")
-  lastShown     DateTime? @map("last_shown") @db.Timestamptz
-  showFrom      DateTime? @map("show_from") @db.Timestamptz
-  showTo        DateTime? @map("show_to") @db.Timestamptz
+  lastShown     DateTime? @map("last_shown") @db.DateTime(3)
+  showFrom      DateTime? @map("show_from") @db.DateTime(3)
+  showTo        DateTime? @map("show_to") @db.DateTime(3)
 
-  // Relations
-  event         SocialEvent @relation(fields: [eventId], references: [id], onDelete: Cascade)
-  comments      Comment[]
+  event    SocialEvent @relation(fields: [eventId], references: [id], onDelete: Cascade)
+  comments Comment[]
 
   @@unique([eventId, index])
-  @@schema("partydropper")
+  @@index([eventId])
   @@map("photos")
 }
 
 model Comment {
-  id            String    @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
-  eventId       String    @map("event_id") @db.Uuid
-  photoId       String?   @map("photo_id") @db.Uuid
+  id            String    @id @default(uuid()) @db.VarChar(36)
+  eventId       String    @map("event_id") @db.VarChar(36)
+  photoId       String?   @map("photo_id") @db.VarChar(36)
   index         Int
-  comment       String
-  commenterName String?   @map("commenter_name")
+  comment       String    @db.VarChar(255)
+  commenterName String?   @map("commenter_name") @db.VarChar(32)
   visible       Boolean   @default(true)
-  createdAt     DateTime  @default(now()) @map("created_at") @db.Timestamptz
-  updatedAt     DateTime  @default(now()) @updatedAt @map("updated_at") @db.Timestamptz
+  createdAt     DateTime  @default(now()) @map("created_at") @db.DateTime(3)
+  updatedAt     DateTime  @default(now()) @updatedAt @map("updated_at") @db.DateTime(3)
   scheduleCount Int       @default(0) @map("schedule_count")
   showCount     Int       @default(0) @map("show_count")
-  lastShown     DateTime? @map("last_shown") @db.Timestamptz
-  showFrom      DateTime? @map("show_from") @db.Timestamptz
-  showTo        DateTime? @map("show_to") @db.Timestamptz
+  lastShown     DateTime? @map("last_shown") @db.DateTime(3)
+  showFrom      DateTime? @map("show_from") @db.DateTime(3)
+  showTo        DateTime? @map("show_to") @db.DateTime(3)
 
-  // Relations
-  event         SocialEvent @relation(fields: [eventId], references: [id], onDelete: Cascade)
-  photo         Photo?      @relation(fields: [photoId], references: [id], onDelete: Cascade)
+  event SocialEvent @relation(fields: [eventId], references: [id], onDelete: Cascade)
+  photo Photo?      @relation(fields: [photoId], references: [id], onDelete: Cascade)
 
   @@unique([eventId, photoId, index])
-  @@schema("partydropper")
+  @@index([eventId])
   @@map("comments")
 }

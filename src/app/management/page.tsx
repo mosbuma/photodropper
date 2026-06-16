@@ -42,13 +42,21 @@ export default function ManagementPage() {
   const [newEventCommentStyle, setNewEventCommentStyle] = useState<'TICKER' | 'COMICBOOK'>('TICKER')
   const [creatingEvent, setCreatingEvent] = useState(false)
   const [newEventError, setNewEventError] = useState<string | null>(null)
-
   // State for new event
   const [newEventEnablePhotoComments, setNewEventEnablePhotoComments] = useState(true);
   const [newEventEnableEventComments, setNewEventEnableEventComments] = useState(false);
   // State for edit event
   const [editEventEnablePhotoComments, setEditEventEnablePhotoComments] = useState(true);
   const [editEventEnableEventComments, setEditEventEnableEventComments] = useState(false);
+
+  // Pagination hooks (must be before any early return)
+  const PHOTOS_PER_PAGE = 12;
+  const [photoPage, setPhotoPage] = useState(1);
+  const totalPhotoPages = Math.ceil(photos.length / PHOTOS_PER_PAGE);
+  const paginatedPhotos = photos.slice((photoPage - 1) * PHOTOS_PER_PAGE, photoPage * PHOTOS_PER_PAGE);
+  useEffect(() => {
+    if (photoPage > totalPhotoPages) setPhotoPage(1);
+  }, [photos.length, totalPhotoPages, photoPage]);
 
   const tabs = useMemo(() => [
     { id: 'events', label: 'Events' },
@@ -170,9 +178,6 @@ export default function ManagementPage() {
         let summary = ''
         if (result.summary) {
           summary += `- Files on disk: ${result.summary.totalFilesOnDisk}\n- Linked in database: ${result.summary.linkedFilesInDatabase}\n- Orphaned files found: ${result.summary.orphanedFilesFound}\n- Files deleted: ${result.summary.filesDeleted}\n- Errors: ${result.summary.filesWithErrors}`
-        }
-        if (result.deletedBlobs) {
-          summary += `\n- Blobs in Vercel: ${result.totalBlobs}\n- Orphaned blobs: ${result.orphanedCount}\n- Blobs deleted: ${result.deletedBlobs.length}`
         }
         setCleanupSummary(summary)
       } else {
@@ -542,71 +547,101 @@ export default function ManagementPage() {
             </div>
             {activeEventId ? (
               photos.length > 0 ? (
-                <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4">
-                  {photos.map((photo) => {
-                    // Filter comments for this specific photo
-                    const photoComments = comments.filter(
-                      (comment) => comment.photoId && String(comment.photoId) === String(photo.id)
-                    );
-                    
-                    // Debug logging
-                    console.log(`Photo ${photo.id}:`, photoComments.length, 'comments')
-                    if (photoComments.length > 0) {
-                      console.log('Photo comments:', photoComments.map(c => ({ id: c.id, comment: c.comment, photoId: c.photoId })))
-                    }
-                    
-                    return (
-                      <div key={photo.id} className="bg-gray-800 rounded-lg overflow-hidden relative group">
-                        {/* eslint-disable-next-line @next/next/no-img-element */}
-                        <img 
-                          src={photo.photoUrl} 
-                          alt="Photo"
-                          className="w-full h-48 object-cover"
-                        />
-                        <div className="flex flex-row flex-wrap gap-2 justify-center items-center mt-1 mb-1 w-full">
-                          {photo.uploaderName && (
-                            <span className="inline-block bg-green-200 text-black text-xs font-semibold px-2 py-0.5 rounded border border-black shadow-sm">
-                              {photo.uploaderName}
-                            </span>
-                          )}
-                          {photo.location && (
-                            <span className="inline-block bg-yellow-200 text-black text-xs font-semibold px-2 py-0.5 rounded border border-black shadow-sm">
-                              {photo.location}
-                            </span>
-                          )}
-                          {photo.dateTaken && (
-                            <span className="inline-block bg-blue-200 text-black text-xs font-semibold px-2 py-0.5 rounded border border-black shadow-sm">
-                              {photo.dateTaken}
-                            </span>
-                          )}
-                          {/* Always show action buttons */}
-                          <div className="flex gap-2 items-center ml-auto">
-                            <button onClick={() => setEditPhoto(photo)} className="bg-white rounded-full p-1 shadow hover:bg-blue-100">
-                              {/* Edit icon (pencil) */}
-                              <svg width="20" height="20" fill="none" viewBox="0 0 24 24" stroke="currentColor" className="text-blue-600"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15.232 5.232l3.536 3.536M9 13l6.586-6.586a2 2 0 112.828 2.828L11.828 15.828a2 2 0 01-1.414.586H7v-3a2 2 0 01.586-1.414z" /></svg>
-                            </button>
-                            <button onClick={() => setDeletePhoto(photo)} className="bg-white rounded-full p-1 shadow hover:bg-red-100">
-                              {/* Trash icon */}
-                              <svg width="20" height="20" fill="none" viewBox="0 0 24 24" stroke="currentColor" className="text-red-600"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6M1 7h22M8 7V5a2 2 0 012-2h4a2 2 0 012 2v2" /></svg>
-                            </button>
+                <>
+                  <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4">
+                    {paginatedPhotos.map((photo) => {
+                      // Filter comments for this specific photo
+                      const photoComments = comments.filter(
+                        (comment) => comment.photoId && String(comment.photoId) === String(photo.id)
+                      );
+                      
+                      // Debug logging
+                      console.log(`Photo ${photo.id}:`, photoComments.length, 'comments')
+                      if (photoComments.length > 0) {
+                        console.log('Photo comments:', photoComments.map(c => ({ id: c.id, comment: c.comment, photoId: c.photoId })))
+                      }
+                      
+                      return (
+                        <div key={photo.id} className="bg-gray-800 rounded-lg overflow-hidden relative group">
+                          {/* eslint-disable-next-line @next/next/no-img-element */}
+                          <img 
+                            src={photo.photoUrl} 
+                            alt="Photo"
+                            className="w-full h-48 object-cover"
+                          />
+                          <div className="flex flex-row flex-wrap gap-2 justify-center items-center mt-1 mb-1 w-full">
+                            {photo.uploaderName && (
+                              <span className="inline-block bg-green-200 text-black text-xs font-semibold px-2 py-0.5 rounded border border-black shadow-sm">
+                                {photo.uploaderName}
+                              </span>
+                            )}
+                            {photo.location && (
+                              <span className="inline-block bg-yellow-200 text-black text-xs font-semibold px-2 py-0.5 rounded border border-black shadow-sm">
+                                {photo.location}
+                              </span>
+                            )}
+                            {photo.dateTaken && (
+                              <span className="inline-block bg-blue-200 text-black text-xs font-semibold px-2 py-0.5 rounded border border-black shadow-sm">
+                                {photo.dateTaken}
+                              </span>
+                            )}
+                            {/* Always show action buttons */}
+                            <div className="flex gap-2 items-center ml-auto">
+                              <button onClick={() => setEditPhoto(photo)} className="bg-white rounded-full p-1 shadow hover:bg-blue-100">
+                                {/* Edit icon (pencil) */}
+                                <svg width="20" height="20" fill="none" viewBox="0 0 24 24" stroke="currentColor" className="text-blue-600"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15.232 5.232l3.536 3.536M9 13l6.586-6.586a2 2 0 112.828 2.828L11.828 15.828a2 2 0 01-1.414.586H7v-3a2 2 0 01.586-1.414z" /></svg>
+                              </button>
+                              <button onClick={() => setDeletePhoto(photo)} className="bg-white rounded-full p-1 shadow hover:bg-red-100">
+                                {/* Trash icon */}
+                                <svg width="20" height="20" fill="none" viewBox="0 0 24 24" stroke="currentColor" className="text-red-600"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6M1 7h22M8 7V5a2 2 0 012-2h4a2 2 0 012 2v2" /></svg>
+                              </button>
+                            </div>
+                          </div>
+                          <div className="p-3">
+                            {/* Photo comments */}
+                            {photoComments.length > 0 && (
+                              <div className="mt-2 space-y-1">
+                                {photoComments.map((comment) => (
+                                  <p key={comment.id} className="text-xs text-gray-500">
+                                    {comment.comment}
+                                  </p>
+                                ))}
+                              </div>
+                            )}
                           </div>
                         </div>
-                        <div className="p-3">
-                          {/* Photo comments */}
-                          {photoComments.length > 0 && (
-                            <div className="mt-2 space-y-1">
-                              {photoComments.map((comment) => (
-                                <p key={comment.id} className="text-xs text-gray-500">
-                                  {comment.comment}
-                                </p>
-                              ))}
-                            </div>
-                          )}
-                        </div>
-                      </div>
-                    )
-                  })}
-                </div>
+                      )
+                    })}
+                  </div>
+                  {/* Pagination controls */}
+                  {totalPhotoPages > 1 && (
+                    <div className="flex justify-center items-center gap-2 mt-6">
+                      <button
+                        className="px-3 py-1 rounded bg-gray-700 text-white disabled:opacity-50"
+                        onClick={() => setPhotoPage(p => Math.max(1, p - 1))}
+                        disabled={photoPage === 1}
+                      >
+                        Previous
+                      </button>
+                      {Array.from({ length: totalPhotoPages }, (_, i) => i + 1).map(pageNum => (
+                        <button
+                          key={pageNum}
+                          className={`px-3 py-1 rounded ${photoPage === pageNum ? 'bg-blue-600 text-white' : 'bg-gray-300 text-gray-800'}`}
+                          onClick={() => setPhotoPage(pageNum)}
+                        >
+                          {pageNum}
+                        </button>
+                      ))}
+                      <button
+                        className="px-3 py-1 rounded bg-gray-700 text-white disabled:opacity-50"
+                        onClick={() => setPhotoPage(p => Math.min(totalPhotoPages, p + 1))}
+                        disabled={photoPage === totalPhotoPages}
+                      >
+                        Next
+                      </button>
+                    </div>
+                  )}
+                </>
               ) : (
                 <div className="text-center py-12">
                   <div className="bg-gray-800 rounded-lg p-8 border border-gray-700">

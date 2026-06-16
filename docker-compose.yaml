@@ -1,0 +1,26 @@
+services:
+  app:
+    build:
+      context: .
+      dockerfile: Dockerfile
+      network: host
+    image: photodropper-app
+    container_name: photodropper-app
+    restart: unless-stopped
+    network_mode: host
+    user: "${CONTAINER_UID:-0}:${CONTAINER_GID:-0}"
+    env_file:
+      - .env
+    environment:
+      - NODE_ENV=production
+      - PORT=${PORT:-3011}
+      - DATABASE_URL=${DATABASE_URL}
+      - NEXTAUTH_SECRET=${NEXTAUTH_SECRET}
+      - NEXTAUTH_URL=${NEXTAUTH_URL}
+      - AUTH_TRUST_HOST=${AUTH_TRUST_HOST:-true}
+      - ADMIN_PASSWORD=${ADMIN_PASSWORD}
+      - PHOTO_UPLOAD_PATH=/data/photos
+      - PUBLIC_BASE_URL=${PUBLIC_BASE_URL}
+      - NEXT_PUBLIC_PLAYLIST_POLL_INTERVAL_MS=${NEXT_PUBLIC_PLAYLIST_POLL_INTERVAL_MS:-5000}
+    volumes:
+      - ${PHOTOS_HOST_DIR:-/volume1/docker-projects/photodropper/photos}:/data/photos:rw

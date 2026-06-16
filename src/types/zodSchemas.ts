@@ -12,7 +12,13 @@ export const socialEventSchema = z.object({
 export const photoSchema = z.object({
   eventId: z.string().uuid(),
   index: z.number().int(),
-  photoUrl: z.string().url(),
+  photoUrl: z
+    .string()
+    .min(1)
+    .refine(
+      (value) => value.startsWith('/api/photos/view/') || z.string().url().safeParse(value).success,
+      { message: 'photoUrl must be a local view path or absolute URL' }
+    ),
   uploaderName: z.string().max(100).optional(),
   dateTaken: z.string().optional(),
   coordinates: z.string().optional(),

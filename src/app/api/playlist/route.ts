@@ -2,13 +2,22 @@ import { NextRequest, NextResponse } from 'next/server'
 import { prisma } from '@/lib/prisma'
 import crypto from 'crypto'
 
-import type { PhotoStreamItem } from '@/lib/slices/appSlice'
+import type { CommentStreamItem, PhotoStreamItem } from '@/lib/slices/appSlice'
+
+export type Playlist = {
+  hash: string
+  photoStream: PhotoStreamItem[]
+  eventCommentStream: CommentStreamItem[]
+  commentStyle: 'TICKER' | 'COMICBOOK'
+}
 
 export type PlaylistResponse = {
   unchanged: boolean
   playlist: (Playlist & { commentStyle: 'TICKER' | 'COMICBOOK' }) | null
   hash: string
 }
+
+
 
 export async function GET(req: NextRequest) {
   const { searchParams } = new URL(req.url)
