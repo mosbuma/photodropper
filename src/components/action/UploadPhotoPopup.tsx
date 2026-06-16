@@ -2,8 +2,8 @@
 
 import { useRef, useState } from 'react'
 import { extractExifData, getLocationFromExif } from '@/lib/photoMeta'
+import { getFileSizeError, getResponseErrorMessage } from '@/lib/fetchUtils'
 import Spinner from '@/components/ui/Spinner'
-import Image from 'next/image'
 
 interface UploadPhotoPopupProps {
   eventId: string
@@ -20,7 +20,7 @@ interface PhotoMeta {
 
 export default function UploadPhotoPopup({ eventId, eventName, onClose }: UploadPhotoPopupProps) {
   const fileInputRef = useRef<HTMLInputElement>(null)
-  const [step, setStep] = useState<'select' | 'uploading' | 'done'>('select')
+  const [step, setStep] = useState<'select' | 'processing' | 'preview' | 'uploading' | 'success'>('select')
   const [file, setFile] = useState<File | null>(null)
   const [meta, setMeta] = useState<PhotoMeta>({
     name: typeof window !== 'undefined' ? localStorage.getItem('photodropper_name') || '' : '',
@@ -34,11 +34,18 @@ export default function UploadPhotoPopup({ eventId, eventName, onClose }: Upload
   // Step 1: Select file and upload
   const handleFileChange = (e: React.ChangeEvent<HTMLInputElement>) => {
     const f = e.target.files?.[0]
-    if (f) {
-      setFile(f)
-      setStep('uploading')
-      uploadFile(f)
+    if (!f) return
+
+    const fileError = getFileSizeError(f)
+    if (fileError) {
+      setError(fileError)
+      e.target.value = ''
+      return
     }
+
+    setFile(f)
+    setStep('processing')
+    uploadFile(f)
   }
 
   // Step 2: Upload file to backend with EXIF extraction
@@ -68,7 +75,7 @@ export default function UploadPhotoPopup({ eventId, eventName, onClose }: Upload
 
       setMeta(updatedMeta)
       setPhotoUrl(URL.createObjectURL(f))
-      setStep('done')
+      setStep('preview')
     } catch (error) {
       console.error('Error in uploadFile:', error)
       setError('Failed to process photo')
@@ -108,15 +115,14 @@ export default function UploadPhotoPopup({ eventId, eventName, onClose }: Upload
       })
 
       if (!response.ok) {
-        const errorData = await response.json()
-        throw new Error(errorData.error || 'Upload failed')
+        throw new Error(await getResponseErrorMessage(response))
       }
 
-      setStep('done')
+      setStep('success')
       setTimeout(onClose, 1200)
     } catch (err) {
       setError(err instanceof Error ? err.message : 'Failed to submit photo info')
-      setStep('done')
+      setStep('preview')
     }
   }
 
@@ -135,7 +141,8 @@ export default function UploadPhotoPopup({ eventId, eventName, onClose }: Upload
         {/* Image area with upload button if no image selected */}
         <div className="mb-4 rounded max-h-40 mx-auto relative w-full h-40 flex items-center justify-center bg-gray-100">
           {photoUrl ? (
-            <Image src={photoUrl} alt="Preview" fill className="object-contain rounded" />
+            /* eslint-disable-next-line @next/next/no-img-element */
+            <img src={photoUrl} alt="Preview" className="max-h-40 w-full object-contain rounded" />
           ) : (
             <button
               className="bg-blue-600 hover:bg-blue-700 text-white px-4 py-2 rounded"
@@ -147,7 +154,7 @@ export default function UploadPhotoPopup({ eventId, eventName, onClose }: Upload
           )}
           <input
             type="file"
-            accept="image/*"
+            accept="image/*,.heic,.heif"
             ref={fileInputRef}
             onChange={handleFileChange}
             className="hidden"
@@ -189,7 +196,7 @@ export default function UploadPhotoPopup({ eventId, eventName, onClose }: Upload
             <button
               type="submit"
               className="bg-green-600 hover:bg-green-700 text-white px-4 py-2 rounded"
-              disabled={!file || step === 'uploading'}
+              disabled={!file || step === 'processing' || step === 'uploading'}
             >
               GO!
             </button>
@@ -204,13 +211,19 @@ export default function UploadPhotoPopup({ eventId, eventName, onClose }: Upload
           {error && <div className="text-red-600 mt-2">{error}</div>}
         </form>
         {/* Uploading and done states */}
-        {step === 'uploading' && (
+        {step === 'processing' && (
           <div className="flex flex-col items-center justify-center min-h-[100px] mt-4">
             <Spinner size="lg" className="mb-4" />
             <p>Processing photo...</p>
           </div>
         )}
-        {step === 'done' && (
+        {step === 'uploading' && (
+          <div className="flex flex-col items-center justify-center min-h-[100px] mt-4">
+            <Spinner size="lg" className="mb-4" />
+            <p>Uploading...</p>
+          </div>
+        )}
+        {step === 'success' && (
           <div className="flex flex-col items-center justify-center min-h-[100px] mt-4">
             <div className="text-green-600 text-4xl mb-2">✓</div>
             <p>Photo uploaded successfully!</p>

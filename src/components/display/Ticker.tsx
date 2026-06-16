@@ -1,63 +1,69 @@
 'use client'
 
+import { useMemo } from 'react'
 import TickerRow from './TickerRow'
 import type { CommentStreamItem } from '@/lib/slices/appSlice'
-import { canShowComment, markCommentShown } from '@/lib/photoMeta';
 
 interface TickerProps {
+  eventId?: string
+  photoId?: string
   photoComments: CommentStreamItem[]
   eventComments: CommentStreamItem[]
+  scrollSpeedPct?: number
+  enablePhotoComments?: boolean
+  enableEventComments?: boolean
 }
 
-export default function Ticker({ photoComments, eventComments }: TickerProps) {
-  // Filter comments to only those that can be shown
-  const filteredPhotoComments = photoComments.filter(c => canShowComment(c.id));
-  const filteredEventComments = eventComments.filter(c => canShowComment(c.id));
+export default function Ticker({
+  eventId,
+  photoId,
+  photoComments,
+  eventComments,
+  scrollSpeedPct = 50,
+  enablePhotoComments = true,
+  enableEventComments = false,
+}: TickerProps) {
+  const photoTickerStyle = useMemo(
+    () => ({ fontSize: '48px', lineHeight: '1.1' as const }),
+    []
+  )
+  const eventTickerStyle = useMemo(
+    () => ({ fontSize: '48px', lineHeight: '1.1' as const }),
+    []
+  )
 
-  // Mark as shown when rendering
-  filteredPhotoComments.forEach(c => markCommentShown(c.id));
-  filteredEventComments.forEach(c => markCommentShown(c.id));
+  const rowCount = (enablePhotoComments ? 1 : 0) + (enableEventComments ? 1 : 0)
 
-  const hasPhotoComments = filteredPhotoComments.length > 0
-  const hasEventComments = filteredEventComments.length > 0
-
-  const photoTickerScrollSpeed = 75
-  const eventTickerScrollSpeed = 25
-
-  // Don't render if no comments
-  if (!hasPhotoComments && !hasEventComments) {
+  if (!enablePhotoComments && !enableEventComments) {
     return null
   }
 
   return (
-    <div className="fixed bottom-6 left-1/4 w-1/2 h-auto z-50 bg-transparent rounded-sm flex flex-col" style={{minHeight: '144px'}}>
-      <div className="max-w-7xl mx-auto w-full">
-        {/* Comments Row */}
-        {hasPhotoComments && (
-          <div>
-            <TickerRow 
-              comments={filteredPhotoComments}
-              scrollSpeed={photoTickerScrollSpeed}
-              className="text-base bg-blue-900 text-white p-4 font-bold"
-              extraStyle={{
-                fontSize: '48px',
-              }}
-            />
-          </div>
+    <div className="fixed bottom-6 left-1/4 w-1/2 z-50 bg-transparent rounded-sm flex flex-col">
+      <div className="max-w-7xl mx-auto w-full flex flex-col" style={{ height: rowCount * 104 }}>
+        {enablePhotoComments && (
+          <TickerRow
+            photoId={photoId}
+            photoComments={photoComments}
+            resetKey={eventId}
+            scrollSpeed={scrollSpeedPct}
+            variant="feed"
+            alwaysVisible
+            className="bg-blue-900 text-white px-4 font-bold shrink-0"
+            extraStyle={photoTickerStyle}
+          />
         )}
-        {hasEventComments && (
-          <div>
-            <TickerRow 
-              comments={filteredEventComments}
-              scrollSpeed={eventTickerScrollSpeed}
-              className="text-base bg-white text-black p-4 font-bold"
-              extraStyle={{
-                fontSize: '48px',
-              }}
-            />
-          </div>
+        {enableEventComments && (
+          <TickerRow
+            comments={eventComments}
+            scrollSpeed={scrollSpeedPct}
+            variant="loop"
+            alwaysVisible
+            className="bg-white text-black px-4 font-bold shrink-0"
+            extraStyle={eventTickerStyle}
+          />
         )}
       </div>
     </div>
   )
-} 
+}

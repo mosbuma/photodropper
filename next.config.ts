@@ -2,8 +2,9 @@ import type { NextConfig } from "next";
 
 const nextConfig: NextConfig = {
   ...(process.env.NODE_ENV === 'production' && { output: 'standalone' }),
-  eslint: {
-    ignoreDuringBuilds: true,
+  allowedDevOrigins: ['192.168.178.*'],
+  experimental: {
+    proxyClientMaxBodySize: '25mb',
   },
 };
 

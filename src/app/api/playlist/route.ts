@@ -9,6 +9,9 @@ export type Playlist = {
   photoStream: PhotoStreamItem[]
   eventCommentStream: CommentStreamItem[]
   commentStyle: 'TICKER' | 'COMICBOOK'
+  scrollSpeedPct: number
+  enablePhotoComments: boolean
+  enableEventComments: boolean
 }
 
 export type PlaylistResponse = {
@@ -116,12 +119,16 @@ export async function GET(req: NextRequest) {
 
     // Get the event to fetch commentStyle
     const commentStyle = event?.commentStyle || 'TICKER'
+    const scrollSpeedPct = event?.scrollSpeedPct ?? 50
 
     const playlist = {
       hash: '',
       photoStream: photoStream,
       eventCommentStream: eventCommentStream,
-      commentStyle
+      commentStyle,
+      scrollSpeedPct,
+      enablePhotoComments,
+      enableEventComments,
     }
 
     // Generate MD5 hash of the playlist content

@@ -206,8 +206,13 @@ export default function Home() {
       {/* Ticker or ComicBook Comments - Bottom */}
       {currentPlaylist?.commentStyle === 'TICKER' ? (
         <Ticker 
+          eventId={activeEventId || undefined}
+          photoId={currentPhoto?.photoId}
           photoComments={photoComments}
           eventComments={eventComments}
+          scrollSpeedPct={currentPlaylist?.scrollSpeedPct ?? 50}
+          enablePhotoComments={currentPlaylist?.enablePhotoComments ?? true}
+          enableEventComments={currentPlaylist?.enableEventComments ?? false}
         />
       ) : (
         <>

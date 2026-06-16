@@ -3,6 +3,7 @@
 import { useState } from 'react'
 import Spinner from '@/components/ui/Spinner'
 import { extractExifData, getLocationFromExif } from '@/lib/photoMeta'
+import { getFileSizeError, getResponseErrorMessage } from '@/lib/fetchUtils'
 
 interface BulkUploadPopupProps {
   eventId: string
@@ -61,6 +62,14 @@ export default function BulkUploadPopup({ eventId, onClose, onUploadComplete }: 
         const file = droppedFiles[i]
         setProgress(prev => prev ? { ...prev, currentFile: file.name } : null)
 
+        const fileError = getFileSizeError(file)
+        if (fileError) {
+          console.error(`Skipping ${file.name}:`, fileError)
+          failed++
+          setProgress(prev => prev ? { ...prev, completed, failed } : null)
+          continue
+        }
+
         try {
           // Extract EXIF metadata and location
           let dateTaken = ''
@@ -90,7 +99,7 @@ export default function BulkUploadPopup({ eventId, onClose, onUploadComplete }: 
           if (uploadResponse.ok) {
             completed++
           } else {
-            console.error(`Upload failed for ${file.name}:`, await uploadResponse.text())
+            console.error(`Upload failed for ${file.name}:`, await getResponseErrorMessage(uploadResponse))
             failed++
           }
         } catch (err) {

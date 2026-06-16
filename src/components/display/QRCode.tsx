@@ -71,7 +71,7 @@ export default function QRCode({ photoId, eventId, large = true }: QRCodeProps) 
         value={actionUrl}
         size={large ? 256: 128}
         level="L"
-        includeMargin={true}
+        marginSize={4}
       />
     </div>
   )

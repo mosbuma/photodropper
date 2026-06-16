@@ -42,6 +42,9 @@ export interface Playlist {
   photoStream: PhotoStreamItem[]
   eventCommentStream: CommentStreamItem[]
   commentStyle: 'TICKER' | 'COMICBOOK'
+  scrollSpeedPct: number
+  enablePhotoComments: boolean
+  enableEventComments: boolean
 }
 
 interface AppState {
