@@ -10,7 +10,7 @@
     "db:generate": "prisma generate",
     "db:push": "prisma db push",
     "db:migrate": "prisma migrate dev",
-    "postinstall": "prisma generate"
+    "docker:build": "bash scripts/build.sh"
   },
   "dependencies": {
     "@prisma/client": "^5.0.0",

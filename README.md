@@ -33,7 +33,7 @@ Open http://localhost:3000 — management password from `ADMIN_PASSWORD` (defaul
 
 ## Synology deployment
 
-See **[SYNO-SETUP.md](./SYNO-SETUP.md)** — MariaDB init, `.env`, then **Container Manager → Project → Create** from `docker-compose.yaml` (port **3011**, host network).
+See **[SYNO-SETUP.md](./SYNO-SETUP.md)** — production URL **`https://photodropper.0x0001.org`** (reverse proxy to port 3011).
 
 ## Environment
 
@@ -41,10 +41,11 @@ See **[SYNO-SETUP.md](./SYNO-SETUP.md)** — MariaDB init, `.env`, then **Contai
 |----------|---------|
 | `DATABASE_URL` | MariaDB connection string |
 | `NEXTAUTH_SECRET` | Session encryption |
-| `NEXTAUTH_URL` | Public app URL |
+| `NEXTAUTH_URL` | Public HTTPS URL (e.g. `https://photodropper.0x0001.org`) |
+| `AUTH_TRUST_HOST` | `true` when using reverse proxy / custom hostname |
+| `PUBLIC_BASE_URL` | Same as `NEXTAUTH_URL` for QR guest links |
 | `ADMIN_PASSWORD` | Management login |
 | `PHOTO_UPLOAD_PATH` | Directory for uploaded images |
-| `PUBLIC_BASE_URL` | LAN URL for QR codes (Syno) |
 | `PORT` | HTTP port (3011 on NAS) |
 | `NEXT_PUBLIC_PLAYLIST_POLL_INTERVAL_MS` | Slideshow playlist poll interval |
 

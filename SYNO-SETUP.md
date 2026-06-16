@@ -11,9 +11,10 @@ Self-hosted party photo wall on the same NAS as FamilyAlbum: **Docker Compose**,
 | Git / Docker project | `/volume1/docker-projects/photodropper` |
 | Photos | `/volume1/docker-projects/photodropper/photos` → container `/data/photos` |
 | MariaDB | NAS MariaDB package, database `photodropper` |
-| App URL | `http://babylon2024.local:3011` |
+| App (public) | `https://photodropper.0x0001.org` (reverse proxy → `127.0.0.1:3011`) |
+| App (LAN direct) | `http://babylon2024.local:3011` (optional, bypasses proxy) |
 
-FamilyAlbum runs separately on port **3010**. Export to FamilyAlbum is a later phase.
+FamilyAlbum: `https://album.0x0001.org`. Export bridge is a later phase.
 
 ---
 
@@ -25,19 +26,47 @@ On the NAS (SSH or phpMyAdmin):
 mysql -u root -p < database/mariadb.init.sql
 ```
 
-Create app user (pick a strong password):
+Create app user (pick a strong password; use the **same host patterns as FamilyAlbum**):
 
 ```sql
-CREATE USER 'photodropper'@'localhost' IDENTIFIED BY 'your-password';
+-- App on NAS (Container Manager, host network)
+CREATE USER IF NOT EXISTS 'photodropper'@'localhost' IDENTIFIED BY 'YOUR_STRONG_PASSWORD';
 GRANT ALL PRIVILEGES ON photodropper.* TO 'photodropper'@'localhost';
+
+-- TCP to MariaDB on the NAS (Prisma / Node)
+CREATE USER IF NOT EXISTS 'photodropper'@'127.0.0.1' IDENTIFIED BY 'YOUR_STRONG_PASSWORD';
+GRANT ALL PRIVILEGES ON photodropper.* TO 'photodropper'@'127.0.0.1';
+
+-- Home LAN (dev laptop, e.g. gozo @ 192.168.178.x)
+CREATE USER IF NOT EXISTS 'photodropper'@'192.168.178.%' IDENTIFIED BY 'YOUR_STRONG_PASSWORD';
+GRANT ALL PRIVILEGES ON photodropper.* TO 'photodropper'@'192.168.178.%';
+
+-- Docker bridge (if anything connects from 172.27.x)
+CREATE USER IF NOT EXISTS 'photodropper'@'172.27.0.%' IDENTIFIED BY 'YOUR_STRONG_PASSWORD';
+GRANT ALL PRIVILEGES ON photodropper.* TO 'photodropper'@'172.27.0.%';
+
+-- VPN (WireGuard / 10.8.0.x)
+CREATE USER IF NOT EXISTS 'photodropper'@'10.8.0.%' IDENTIFIED BY 'YOUR_STRONG_PASSWORD';
+GRANT ALL PRIVILEGES ON photodropper.* TO 'photodropper'@'10.8.0.%';
+
 FLUSH PRIVILEGES;
 ```
 
-Connection string:
+In phpMyAdmin **User accounts** you should see `photodropper` for each host, with **ALL PRIVILEGES** on `photodropper.*` (not USAGE only). If you only see USAGE, run the `GRANT ALL` lines again.
+
+Connection string for the **Docker stack on the NAS**:
 
 ```env
-DATABASE_URL=mysql://photodropper:your-password@127.0.0.1:3306/photodropper
+DATABASE_URL=mysql://photodropper:YOUR_STRONG_PASSWORD@127.0.0.1:3306/photodropper
 ```
+
+For **dev on your laptop** (remote to NAS):
+
+```env
+DATABASE_URL=mysql://photodropper:YOUR_STRONG_PASSWORD@babylon2024.local:3306/photodropper
+```
+
+URL-encode special characters in the password (`!` → `%21`, etc.).
 
 ---
 
@@ -58,11 +87,12 @@ Recommended: launch the stack from **Container Manager** instead of SSH.
 
 1. Project folder on the NAS: `/volume1/docker-projects/photodropper` (contains `docker-compose.yaml`, `Dockerfile`, source).
 2. Copy [`.env.example`](.env.example) → `.env` in the same folder (File Station → edit, or SSH).
-3. Set in `.env`:
+3. Set in `.env` (or copy [`.env.synology.example`](.env.synology.example)):
    - `DATABASE_URL` — from step 1
    - `NEXTAUTH_SECRET` — e.g. `openssl rand -base64 32`
-   - `ADMIN_PASSWORD` / `NEXT_PUBLIC_ADMIN_PASSWORD`
-   - `NEXTAUTH_URL` and `PUBLIC_BASE_URL` — `http://babylon2024.local:3011`
+   - `ADMIN_PASSWORD`
+   - `NEXTAUTH_URL` and `PUBLIC_BASE_URL` — `https://photodropper.0x0001.org`
+   - `AUTH_TRUST_HOST=true`
 4. Create photos folder: `/volume1/docker-projects/photodropper/photos` (empty is fine).
 
 ### 3.2 Create project in Container Manager
@@ -90,17 +120,40 @@ Prisma schema is applied via `database/mariadb.init.sql`. After schema changes r
 
 ---
 
-## 4. Verify
+## 4. Reverse proxy (HTTPS)
 
-1. Open `http://babylon2024.local:3011` — slideshow (create event in management first).
-2. Open `/management` — sign in with `ADMIN_PASSWORD`.
-3. Create an event, upload a test photo (bulk upload or mobile `/action` flow).
-4. Confirm file appears under `/volume1/docker-projects/photodropper/photos`.
-5. `GET /api/local-ip` should return the LAN base URL for QR codes.
+Same pattern as FamilyAlbum (`album.0x0001.org`):
+
+1. **Control Panel → Login Portal → Advanced → Reverse Proxy**
+2. Add rule:
+   - **Source:** `https://photodropper.0x0001.org` (port 443)
+   - **Destination:** `http://localhost:3011` (or NAS LAN IP + `3011`)
+3. Ensure DNS for `photodropper.0x0001.org` points at the NAS (or your front door).
+4. In `.env`:
+
+```env
+NEXTAUTH_URL=https://photodropper.0x0001.org
+PUBLIC_BASE_URL=https://photodropper.0x0001.org
+AUTH_TRUST_HOST=true
+```
+
+`PUBLIC_BASE_URL` drives QR guest links; `NEXTAUTH_URL` drives admin sign-in. Use the same HTTPS URL for both when everything goes through the proxy.
+
+Restart the container after changing `.env`.
 
 ---
 
-## 5. Dev laptop
+## 5. Verify
+
+1. Open `https://photodropper.0x0001.org` — slideshow (create event in management first).
+2. Open `/management` — sign in with `ADMIN_PASSWORD`.
+3. Create an event, upload a test photo (bulk upload or mobile `/action` flow).
+4. Confirm file appears under `/volume1/docker-projects/photodropper/photos`.
+5. QR codes should link to `https://photodropper.0x0001.org/action?...` (check `/api/local-ip` returns the same base URL).
+
+---
+
+## 6. Dev laptop
 
 Mount NAS photos optional; for local dev:
 
@@ -115,11 +168,12 @@ Ensure MariaDB on the NAS allows remote connections from your laptop, or run Mar
 
 ---
 
-## Troubleshooting
+## 7. Troubleshooting
 
 | Issue | Check |
 |-------|--------|
 | DB connection refused | MariaDB running; `127.0.0.1:3306` from host network container |
 | Upload fails | `PHOTOS_HOST_DIR` writable; `PHOTO_UPLOAD_PATH=/data/photos` in compose |
-| QR wrong host | Set `PUBLIC_BASE_URL` in `.env` |
+| QR wrong host | `PUBLIC_BASE_URL=https://photodropper.0x0001.org` |
+| Auth redirect loop | `NEXTAUTH_URL` must match browser URL; `AUTH_TRUST_HOST=true` |
 | Blank slideshow | Event selected; photos `visible=true`; playlist polling in browser console |

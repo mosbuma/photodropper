@@ -1,0 +1,15 @@
+node_modules
+.next
+.git
+.gitignore
+.env
+.env.*
+!.env.example
+.cache
+photos
+import
+*.md
+!README.md
+tsconfig.tsbuildinfo
+coverage
+.DS_Store

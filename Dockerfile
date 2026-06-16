@@ -14,6 +14,8 @@ RUN npm ci --prefer-offline --no-audit --fetch-timeout=600000
 FROM node:22-alpine AS builder
 WORKDIR /app
 
+RUN apk add --no-cache openssl libc6-compat
+
 COPY --from=deps /app/node_modules ./node_modules
 COPY . .
 
@@ -30,7 +32,7 @@ WORKDIR /app
 ENV NODE_ENV=production
 ENV NEXT_TELEMETRY_DISABLED=1
 
-RUN apk add --no-cache libc6-compat
+RUN apk add --no-cache libc6-compat openssl
 
 RUN addgroup --system --gid 1001 nodejs && \
     adduser --system --uid 1001 nextjs

@@ -31,5 +31,5 @@ sudo docker compose build
 sudo docker compose up -d
 
 echo ""
-echo "Done. Open PUBLIC_BASE_URL from .env (default http://babylon2024.local:3011)"
+echo "Done. Open https://photodropper.0x0001.org (or PUBLIC_BASE_URL from .env)"
 echo "Logs: sudo docker compose logs -f app"
