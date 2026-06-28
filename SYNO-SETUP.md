@@ -123,8 +123,9 @@ Prisma schema is applied via `database/mariadb.init.sql`. After schema changes r
 ```bash
 cd /volume1/docker-projects/photodropper
 mysql -u photodropper -p photodropper < database/migrations/20260628_add_media_columns.sql
-sudo docker compose build --no-cache && sudo docker compose up -d
+sudo docker compose build --no-cache && sudo docker compose up -d --force-recreate
 curl -s http://127.0.0.1:3012/api/health/storage   # should return {"ok":true,"path":"/data/photos"}
+sudo docker exec photodropper-app ls /data/photos | wc -l   # must match: ls photos | wc -l
 curl -sI http://127.0.0.1:3012/api/photos/view/test.jpg   # JSON 404, not HTML
 ```
 
@@ -186,7 +187,8 @@ Ensure MariaDB on the NAS allows remote connections from your laptop, or run Mar
 | DB connection refused | MariaDB running; `127.0.0.1:3306` from host network container |
 | Upload fails | `PHOTOS_HOST_DIR` writable; `PHOTO_UPLOAD_PATH=/data/photos` in compose; reverse proxy `client_max_body_size` ≥ 550m |
 | Photos 404 (HTML page) | Stale Docker image — rebuild after syncing `src/app/api/photos/`; verify with `/api/health/storage` |
-| Photos 404 (JSON) | File missing from `PHOTOS_HOST_DIR`; dev/prod must share same folder if sharing DB |
+| Photos 404 (JSON), files exist on NAS | `ls photos/` has files but container is empty — volume not mounted. Recreate stack: `sudo docker compose up -d --force-recreate`, then `sudo docker exec photodropper-app ls /data/photos \| wc -l` must match host count |
+| Photos 404 (JSON), files missing | File missing from `PHOTOS_HOST_DIR`; dev/prod must share same folder if sharing DB |
 | QR wrong host | `PUBLIC_BASE_URL=https://photodropper.0x0001.org` |
 | Auth redirect loop | `NEXTAUTH_URL` must match browser URL; `AUTH_TRUST_HOST=true` |
 | Blank slideshow | Event selected; photos `visible=true`; playlist polling in browser console |

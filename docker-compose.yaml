@@ -20,7 +20,14 @@ services:
       - AUTH_TRUST_HOST=${AUTH_TRUST_HOST:-true}
       - ADMIN_PASSWORD=${ADMIN_PASSWORD}
       - PHOTO_UPLOAD_PATH=/data/photos
+      - PHOTOS_HOST_DIR=${PHOTOS_HOST_DIR}
       - PUBLIC_BASE_URL=${PUBLIC_BASE_URL}
       - NEXT_PUBLIC_PLAYLIST_POLL_INTERVAL_MS=${NEXT_PUBLIC_PLAYLIST_POLL_INTERVAL_MS:-5000}
     volumes:
-      - ${PHOTOS_HOST_DIR:-/volume1/docker-projects/photodropper/photos}:/data/photos:rw
+      # Bind mount photos — PHOTOS_HOST_DIR must be set in .env (see .env.synology.example).
+      # After changing this file or .env, recreate: sudo docker compose up -d --force-recreate
+      - type: bind
+        source: ${PHOTOS_HOST_DIR}
+        target: /data/photos
+        bind:
+          create_host_path: true
