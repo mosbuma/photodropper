@@ -15,12 +15,12 @@ export async function GET(
     })
 
     if (!event) {
-      return NextResponse.json({ error: 'Event not found' }, { status: 404 })
+      return NextResponse.json({ error: 'Feest niet gevonden' }, { status: 404 })
     }
 
     return NextResponse.json(stripAccessCode(event))
   } catch (error) {
     console.error('Error fetching event:', error)
-    return NextResponse.json({ error: 'Failed to fetch event' }, { status: 500 })
+    return NextResponse.json({ error: 'Kon feest niet laden' }, { status: 500 })
   }
 }

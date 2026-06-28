@@ -18,6 +18,7 @@ interface TickerRowProps {
   extraStyle?: React.CSSProperties
   variant?: 'feed' | 'loop'
   alwaysVisible?: boolean
+  rowHeightPx?: number
 }
 
 function TickerTextSeparator() {
@@ -108,7 +109,6 @@ function computeOffscreenGap(
   translateX: number,
   beltWidth: number
 ): number {
-  if (beltWidth <= 0) return 0
   return Math.max(0, containerWidth - translateX - beltWidth)
 }
 
@@ -116,7 +116,11 @@ function applyTrackTransform(track: HTMLElement, translateX: number) {
   track.style.transform = `translate3d(${translateX}px, 0, 0)`
 }
 
-const TICKER_ROW_HEIGHT_PX = 104
+const DEFAULT_TICKER_ROW_HEIGHT_PX = 104
+
+function rowHeight(rowHeightPx?: number) {
+  return rowHeightPx ?? DEFAULT_TICKER_ROW_HEIGHT_PX
+}
 
 function FeedTickerRow({
   photoComments = [],
@@ -126,6 +130,7 @@ function FeedTickerRow({
   className = '',
   extraStyle,
   alwaysVisible = false,
+  rowHeightPx,
 }: Omit<TickerRowProps, 'variant' | 'comments'>) {
   const containerRef = useRef<HTMLDivElement>(null)
   const trackRef = useRef<HTMLDivElement>(null)
@@ -140,6 +145,7 @@ function FeedTickerRow({
   const pendingAppendsRef = useRef<CommentStreamItem[]>([])
   const pendingAppendPhotoIdRef = useRef<string | null>(null)
   const pendingAnchorFixRef = useRef<number | null>(null)
+  const beltUpdatePendingRef = useRef(false)
 
   const [beltItems, setBeltItems] = useState<BeltItem[]>([])
 
@@ -196,6 +202,24 @@ function FeedTickerRow({
     setBeltItems((prev) => [...prev, ...newItems])
   }
 
+  const ensureInitialized = () => {
+    const container = containerRef.current
+    const track = trackRef.current
+    if (
+      initializedRef.current ||
+      !container ||
+      !track ||
+      beltItemsRef.current.length === 0 ||
+      container.offsetWidth <= 0
+    ) {
+      return
+    }
+
+    translateRef.current = container.offsetWidth
+    initializedRef.current = true
+    applyTrackTransform(track, translateRef.current)
+  }
+
   useEffect(() => {
     lastPhotoIdRef.current = null
     seenForCurrentPhotoRef.current.clear()
@@ -206,6 +230,7 @@ function FeedTickerRow({
     pendingAppendsRef.current = []
     pendingAppendPhotoIdRef.current = null
     pendingAnchorFixRef.current = null
+    beltUpdatePendingRef.current = false
     setBeltItems([])
     if (trackRef.current) {
       applyTrackTransform(trackRef.current, 0)
@@ -235,6 +260,7 @@ function FeedTickerRow({
     if (!track || !container) return
 
     flushPendingAppends()
+    ensureInitialized()
 
     if (pendingAnchorFixRef.current !== null && track.children.length > 0) {
       const anchor = track.children[0] as HTMLElement
@@ -245,20 +271,25 @@ function FeedTickerRow({
       pendingAnchorFixRef.current = null
     }
 
-    if (
-      !initializedRef.current &&
-      beltItemsRef.current.length > 0 &&
-      container.offsetWidth > 0 &&
-      translateRef.current === 0
-    ) {
-      translateRef.current = container.offsetWidth
-      initializedRef.current = true
-    }
+    beltUpdatePendingRef.current = false
+
+    ensureInitialized()
 
     if (initializedRef.current && beltItemsRef.current.length > 0) {
       applyTrackTransform(track, translateRef.current)
     }
   })
+
+  useEffect(() => {
+    const container = containerRef.current
+    if (!container) return
+
+    const ro = new ResizeObserver(() => {
+      ensureInitialized()
+    })
+    ro.observe(container)
+    return () => ro.disconnect()
+  }, [])
 
   useEffect(() => {
     const speed = pixelsPerSecond(scrollSpeed)
@@ -275,7 +306,8 @@ function FeedTickerRow({
       const track = trackRef.current
       const currentPhotoId = photoIdRef.current
 
-      if (track && beltItemsRef.current.length > 0) {
+      if (track && beltItemsRef.current.length > 0 && !beltUpdatePendingRef.current) {
+        ensureInitialized()
         translateRef.current -= speed * dt
         applyTrackTransform(track, translateRef.current)
 
@@ -311,8 +343,10 @@ function FeedTickerRow({
           }
 
           if (keysToRemove.length > 0) {
+            beltUpdatePendingRef.current = true
+
             const anchorEl = track.children[keysToRemove.length] as HTMLElement | undefined
-            if (anchorEl) {
+            if (anchorEl && recycleComments.length === 0) {
               pendingAnchorFixRef.current = anchorEl.getBoundingClientRect().left
             }
 
@@ -351,7 +385,7 @@ function FeedTickerRow({
     <div
       ref={containerRef}
       className={`overflow-hidden whitespace-nowrap flex items-center ${className}${showBar ? '' : ' invisible'}`}
-      style={{ height: TICKER_ROW_HEIGHT_PX, ...extraStyle }}
+      style={{ height: rowHeight(rowHeightPx), ...extraStyle }}
       aria-hidden={!hasContent}
     >
       <div
@@ -371,6 +405,7 @@ function LoopTickerRow({
   className = '',
   extraStyle,
   alwaysVisible = false,
+  rowHeightPx,
 }: Omit<TickerRowProps, 'variant' | 'photoComments' | 'resetKey'>) {
   const containerRef = useRef<HTMLDivElement>(null)
   const segmentRef = useRef<HTMLSpanElement>(null)
@@ -414,7 +449,7 @@ function LoopTickerRow({
       <div
         ref={containerRef}
         className={`overflow-hidden whitespace-nowrap flex items-center ${className}`}
-        style={{ height: TICKER_ROW_HEIGHT_PX, ...extraStyle }}
+        style={{ height: rowHeight(rowHeightPx), ...extraStyle }}
         aria-hidden={!hasComments}
       >
         {hasComments ? (

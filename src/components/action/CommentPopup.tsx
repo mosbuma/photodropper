@@ -2,6 +2,8 @@
 
 import { useState, useEffect } from 'react'
 import Spinner from '@/components/ui/Spinner'
+import RotateDevicePrompt from '@/components/ui/RotateDevicePrompt'
+import { useMobileLandscape } from '@/lib/useIsMobile'
 import { useAppSelector } from '@/lib/hooks'
 import MediaThumbnail from '@/components/display/MediaThumbnail'
 
@@ -14,6 +16,7 @@ interface CommentPopupProps {
 }
 
 export default function CommentPopup({ eventId, photoId, type, accessCode, onClose }: CommentPopupProps) {
+  const mobileLandscape = useMobileLandscape()
   const [name, setName] = useState(
     typeof window !== 'undefined' ? localStorage.getItem('photodropper_name') || '' : ''
   )
@@ -102,27 +105,41 @@ export default function CommentPopup({ eventId, photoId, type, accessCode, onClo
 
       if (!response.ok) {
         const errorData = await response.json()
-        throw new Error(errorData.error || 'Failed to submit comment')
+        throw new Error(errorData.error || 'Kon reactie niet verzenden')
       }
 
       onClose()
     } catch (err) {
       console.error('Error submitting comment:', JSON.stringify(err, null, 2))
-      setError('Failed to submit comment')
+      setError('Kon reactie niet verzenden')
     } finally {
       setIsSubmitting(false)
     }
   }
 
   return (
-    <div className="fixed inset-0 bg-black bg-opacity-70 flex items-center justify-center z-50">
-      <div className="bg-white text-black rounded-lg p-6 w-full max-w-sm relative">
+    <div className="fixed inset-0 bg-black bg-opacity-70 flex items-center justify-center z-50 p-4">
+      <div className="bg-white text-black rounded-lg p-6 w-full max-w-sm relative max-h-[95vh] overflow-y-auto">
         <button className="absolute top-2 right-2 text-gray-500" onClick={onClose}>&times;</button>
         
-        <h2 className="text-xl font-bold mb-4">
-          Comment on {type === 'photo' ? 'Photo' : 'Event'}
+        <h2 className="text-xl font-bold mb-4 pr-6">
+          {type === 'photo' ? 'Reageren op foto' : 'Reageren op feest'}
         </h2>
 
+        {mobileLandscape && !isSubmitting ? (
+          <>
+            <RotateDevicePrompt message="Draai je telefoon om te reageren" />
+            <div className="flex justify-center mt-2">
+              <button
+                type="button"
+                className="bg-gray-400 hover:bg-gray-500 text-white px-4 py-2 rounded"
+                onClick={onClose}
+              >
+                Annuleren
+              </button>
+            </div>
+          </>
+        ) : (
         <form onSubmit={handleSubmit}>
           {/* Photo preview for photo comments */}
           {type === 'photo' && previewMedia && (
@@ -131,7 +148,7 @@ export default function CommentPopup({ eventId, photoId, type, accessCode, onClo
                 photoUrl={previewMedia.photoUrl}
                 thumbnailUrl={previewMedia.thumbnailUrl}
                 mediaType={previewMedia.mediaType}
-                alt="Media preview"
+                alt="Mediavoorbeeld"
                 className="w-auto h-48 object-cover rounded shadow border"
                 videoControls
               />
@@ -139,7 +156,7 @@ export default function CommentPopup({ eventId, photoId, type, accessCode, onClo
           )}
           <input
             type="text"
-            placeholder="Name (Anonymous)"
+            placeholder="Naam (anoniem)"
             value={name}
             maxLength={10}
             onChange={e => setName(e.target.value)}
@@ -147,7 +164,7 @@ export default function CommentPopup({ eventId, photoId, type, accessCode, onClo
           />
           
           <textarea
-            placeholder="Add a comment"
+            placeholder="Voeg een reactie toe"
             value={comment}
             maxLength={100}
             onChange={e => setComment(e.target.value)}
@@ -162,7 +179,7 @@ export default function CommentPopup({ eventId, photoId, type, accessCode, onClo
               onClick={onClose}
               disabled={isSubmitting}
             >
-              Cancel
+              Annuleren
             </button>
             <button
               type="submit"
@@ -172,16 +189,17 @@ export default function CommentPopup({ eventId, photoId, type, accessCode, onClo
               {isSubmitting ? (
                 <div className="flex items-center gap-2">
                   <Spinner size="sm" />
-                  Submitting...
+                  Verzenden...
                 </div>
               ) : (
-                'GO!'
+                'GA!'
               )}
             </button>
           </div>
 
           {error && <div className="text-red-600 mt-2">{error}</div>}
         </form>
+        )}
       </div>
     </div>
   )

@@ -29,14 +29,14 @@ export async function GET(req: NextRequest) {
   const clientHash = searchParams.get('hash')
 
   if (!eventId) {
-    return NextResponse.json({ error: 'Missing eventId' }, { status: 400 })
+    return NextResponse.json({ error: 'eventId ontbreekt' }, { status: 400 })
   }
 
   try {
     // Fetch the event to get its settings
     const event = await prisma.socialEvent.findUnique({ where: { id: eventId } });
     if (!event) {
-      return NextResponse.json({ error: 'Event not found' }, { status: 404 });
+      return NextResponse.json({ error: 'Feest niet gevonden' }, { status: 404 });
     }
     const enablePhotoComments = event.enablePhotoComments ?? true;
     const enableEventComments = event.enableEventComments ?? false;
@@ -161,6 +161,6 @@ export async function GET(req: NextRequest) {
 
   } catch (error) {
     console.error('Error fetching playlist:', error)
-    return NextResponse.json({ error: 'Failed to fetch playlist' }, { status: 500 })
+    return NextResponse.json({ error: 'Kon afspeellijst niet laden' }, { status: 500 })
   }
 } 

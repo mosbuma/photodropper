@@ -19,8 +19,8 @@ export default function MediaDisplay({ onVideoEnded }: MediaDisplayProps) {
     return (
       <div className="min-h-screen bg-black flex items-center justify-center">
         <div className="text-white text-center">
-          <h2 className="text-2xl font-bold mb-2">No Media</h2>
-          <p className="text-gray-400">Upload photos or videos to get started!</p>
+          <h2 className="text-2xl font-bold mb-2">Geen media</h2>
+          <p className="text-gray-400">Upload foto&apos;s of video&apos;s om te beginnen!</p>
         </div>
       </div>
     )
@@ -45,7 +45,7 @@ export default function MediaDisplay({ onVideoEnded }: MediaDisplayProps) {
           <img
             key={currentItem.id}
             src={mediaUrl}
-            alt={`Photo ${currentPhotoIndex + 1}`}
+            alt={`Foto ${currentPhotoIndex + 1}`}
             className="w-full h-full object-contain"
           />
         )}

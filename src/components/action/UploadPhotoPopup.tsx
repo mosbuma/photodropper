@@ -11,7 +11,9 @@ import {
   captureVideoThumbnail,
 } from '@/lib/mediaUtils'
 import { getResponseErrorMessage } from '@/lib/fetchUtils'
+import { useMobileLandscape } from '@/lib/useIsMobile'
 import Spinner from '@/components/ui/Spinner'
+import RotateDevicePrompt from '@/components/ui/RotateDevicePrompt'
 
 interface UploadPhotoPopupProps {
   eventId: string
@@ -29,6 +31,7 @@ interface PhotoMeta {
 
 export default function UploadPhotoPopup({ eventId, eventName, accessCode, onClose }: UploadPhotoPopupProps) {
   const fileInputRef = useRef<HTMLInputElement>(null)
+  const mobileLandscape = useMobileLandscape()
   const [step, setStep] = useState<'select' | 'processing' | 'preview' | 'uploading' | 'success'>('select')
   const [file, setFile] = useState<File | null>(null)
   const [mediaKind, setMediaKind] = useState<'image' | 'video'>('image')
@@ -96,7 +99,7 @@ export default function UploadPhotoPopup({ eventId, eventName, accessCode, onClo
       setStep('preview')
     } catch (err) {
       console.error('Error processing file:', err)
-      setError('Failed to process file')
+      setError('Kon bestand niet verwerken')
       setStep('select')
     }
   }
@@ -140,25 +143,41 @@ export default function UploadPhotoPopup({ eventId, eventName, accessCode, onClo
       setStep('success')
       setTimeout(onClose, 1200)
     } catch (err) {
-      setError(err instanceof Error ? err.message : 'Failed to submit')
+      setError(err instanceof Error ? err.message : 'Kon niet verzenden')
       setStep('preview')
     }
   }
 
   return (
-    <div className="fixed inset-0 bg-black bg-opacity-70 flex items-center justify-center z-50">
-      <div className="bg-white text-black rounded-lg p-6 w-full max-w-sm relative">
+    <div className="fixed inset-0 bg-black bg-opacity-70 flex items-center justify-center z-50 p-4">
+      <div className="bg-white text-black rounded-lg p-6 w-full max-w-sm relative max-h-[95vh] overflow-y-auto">
         <button className="absolute top-2 right-2 text-gray-500" onClick={onClose}>&times;</button>
-        <h2 className="text-xl font-bold mb-4">
-          Upload Photo or Video{eventName ? ` to ${eventName}` : ''}
+        <h2 className="text-xl font-bold mb-4 pr-6">
+          Foto of video uploaden{eventName ? ` naar ${eventName}` : ''}
         </h2>
+
+        {mobileLandscape && (step === 'select' || step === 'preview') ? (
+          <>
+            <RotateDevicePrompt message="Draai je telefoon om te uploaden" />
+            <div className="flex justify-center mt-2">
+              <button
+                type="button"
+                className="bg-gray-400 hover:bg-gray-500 text-white px-4 py-2 rounded"
+                onClick={onClose}
+              >
+                Annuleren
+              </button>
+            </div>
+          </>
+        ) : (
+          <>
         <div className="mb-4 rounded max-h-40 mx-auto relative w-full h-40 flex items-center justify-center bg-gray-100">
           {previewUrl ? (
             mediaKind === 'video' ? (
               <video src={previewUrl} controls className="max-h-40 w-full object-contain rounded" />
             ) : (
               /* eslint-disable-next-line @next/next/no-img-element */
-              <img src={previewUrl} alt="Preview" className="max-h-40 w-full object-contain rounded" />
+              <img src={previewUrl} alt="Voorbeeld" className="max-h-40 w-full object-contain rounded" />
             )
           ) : (
             <button
@@ -166,7 +185,7 @@ export default function UploadPhotoPopup({ eventId, eventName, accessCode, onClo
               onClick={() => fileInputRef.current?.click()}
               type="button"
             >
-              Choose File
+              Bestand kiezen
             </button>
           )}
           <input
@@ -185,7 +204,7 @@ export default function UploadPhotoPopup({ eventId, eventName, accessCode, onClo
         <form onSubmit={handleMetaSubmit}>
           <input
             type="text"
-            placeholder="Name (Anonymous)"
+            placeholder="Naam (anoniem)"
             value={meta.name}
             maxLength={10}
             onChange={e => setMeta({ ...meta, name: e.target.value })}
@@ -193,7 +212,7 @@ export default function UploadPhotoPopup({ eventId, eventName, accessCode, onClo
           />
           <input
             type="text"
-            placeholder="Comment (optional)"
+            placeholder="Reactie (optioneel)"
             value={meta.comment}
             maxLength={100}
             onChange={e => setMeta({ ...meta, comment: e.target.value })}
@@ -201,14 +220,14 @@ export default function UploadPhotoPopup({ eventId, eventName, accessCode, onClo
           />
           <input
             type="text"
-            placeholder="Location (optional)"
+            placeholder="Locatie (optioneel)"
             value={meta.location}
             onChange={e => setMeta({ ...meta, location: e.target.value })}
             className="w-full mb-2 px-3 py-2 border rounded"
           />
           <input
             type="text"
-            placeholder="Date (optional)"
+            placeholder="Datum (optioneel)"
             value={meta.date}
             onChange={e => setMeta({ ...meta, date: e.target.value })}
             className="w-full mb-2 px-3 py-2 border rounded"
@@ -219,14 +238,14 @@ export default function UploadPhotoPopup({ eventId, eventName, accessCode, onClo
               className="bg-green-600 hover:bg-green-700 text-white px-4 py-2 rounded"
               disabled={!file || step === 'processing' || step === 'uploading'}
             >
-              GO!
+              GA!
             </button>
             <button
               type="button"
               className="bg-gray-400 hover:bg-gray-500 text-white px-4 py-2 rounded"
               onClick={onClose}
             >
-              Cancel
+              Annuleren
             </button>
           </div>
           {error && <div className="text-red-600 mt-2">{error}</div>}
@@ -234,20 +253,22 @@ export default function UploadPhotoPopup({ eventId, eventName, accessCode, onClo
         {step === 'processing' && (
           <div className="flex flex-col items-center justify-center min-h-[100px] mt-4">
             <Spinner size="lg" className="mb-4" />
-            <p>Processing...</p>
+            <p>Verwerken...</p>
           </div>
         )}
         {step === 'uploading' && (
           <div className="flex flex-col items-center justify-center min-h-[100px] mt-4">
             <Spinner size="lg" className="mb-4" />
-            <p>Uploading...</p>
+            <p>Uploaden...</p>
           </div>
         )}
         {step === 'success' && (
           <div className="flex flex-col items-center justify-center min-h-[100px] mt-4">
             <div className="text-green-600 text-4xl mb-2">✓</div>
-            <p>Upload successful!</p>
+            <p>Upload gelukt!</p>
           </div>
+        )}
+          </>
         )}
       </div>
     </div>

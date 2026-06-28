@@ -22,12 +22,12 @@ export default function SignIn() {
       })
 
       if (result?.error) {
-        setError('Invalid password')
+        setError('Ongeldig wachtwoord')
       } else {
         router.push('/management')
       }
     } catch (error) {
-      setError('An error occurred')
+      setError('Er is een fout opgetreden')
     } finally {
       setLoading(false)
     }
@@ -41,7 +41,7 @@ export default function SignIn() {
         <form onSubmit={handleSubmit} className="space-y-4">
           <div>
             <label htmlFor="password" className="block text-sm font-medium mb-2">
-              Admin Password
+              Adminwachtwoord
             </label>
             <input
               type="password"
@@ -49,7 +49,7 @@ export default function SignIn() {
               value={password}
               onChange={(e) => setPassword(e.target.value)}
               className="w-full px-3 py-2 bg-gray-700 border border-gray-600 rounded focus:outline-none focus:border-blue-500"
-              placeholder="Enter admin password"
+              placeholder="Voer adminwachtwoord in"
               required
             />
           </div>
@@ -63,7 +63,7 @@ export default function SignIn() {
             disabled={loading}
             className="w-full bg-blue-600 hover:bg-blue-700 disabled:bg-gray-600 py-2 px-4 rounded font-medium"
           >
-            {loading ? 'Signing in...' : 'Sign In'}
+            {loading ? 'Bezig met inloggen...' : 'Inloggen'}
           </button>
         </form>
         
@@ -72,7 +72,7 @@ export default function SignIn() {
             onClick={() => router.push('/')}
             className="text-gray-400 hover:text-gray-300 text-sm"
           >
-            Back to Home
+            Terug naar home
           </button>
         </div>
       </div>

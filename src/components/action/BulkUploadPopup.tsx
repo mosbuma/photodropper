@@ -39,7 +39,7 @@ export default function BulkUploadPopup({ eventId, onClose, onUploadComplete }: 
     e.preventDefault()
 
     if (droppedFiles.length === 0) {
-      setError('Please drop photo or video files to upload')
+      setError('Sleep foto- of videobestanden om te uploaden')
       return
     }
 
@@ -125,11 +125,11 @@ export default function BulkUploadPopup({ eventId, onClose, onUploadComplete }: 
     setIsUploading(false)
 
     if (completed > 0) {
-      alert(`Upload completed! Successfully uploaded ${completed} file(s)${failed > 0 ? `, ${failed} failed` : ''}.`)
+      alert(`Upload voltooid! ${completed} bestand${completed !== 1 ? 'en' : ''} geüpload${failed > 0 ? `, ${failed} mislukt` : ''}.`)
       onUploadComplete()
       onClose()
     } else {
-      setError(`Upload failed. ${failed} files could not be processed.`)
+      setError(`Upload mislukt. ${failed} bestanden konden niet worden verwerkt.`)
     }
   }
 
@@ -141,7 +141,7 @@ export default function BulkUploadPopup({ eventId, onClose, onUploadComplete }: 
     const files = Array.from(e.dataTransfer.files).filter(f => getMediaKind(f) !== null)
 
     if (files.length === 0) {
-      setError('Please drop photo or video files only')
+      setError('Alleen foto- of videobestanden toegestaan')
       return
     }
 
@@ -160,14 +160,14 @@ export default function BulkUploadPopup({ eventId, onClose, onUploadComplete }: 
           &times;
         </button>
 
-        <h2 className="text-xl font-bold mb-4">Bulk Upload Photos & Videos</h2>
+        <h2 className="text-xl font-bold mb-4">Foto&apos;s &amp; video&apos;s bulk uploaden</h2>
 
         <form onSubmit={handleSubmit}>
           <div className="mb-4">
-            <label className="block text-sm font-medium mb-2">Uploader Name</label>
+            <label className="block text-sm font-medium mb-2">Naam uploader</label>
             <input
               type="text"
-              placeholder="Anonymous"
+              placeholder="Anoniem"
               value={uploaderName}
               maxLength={10}
               onChange={e => setUploaderName(e.target.value)}
@@ -177,7 +177,7 @@ export default function BulkUploadPopup({ eventId, onClose, onUploadComplete }: 
           </div>
 
           <div className="mb-4">
-            <label className="block text-sm font-medium mb-2">Drop Files Here</label>
+            <label className="block text-sm font-medium mb-2">Bestanden hier neerzetten</label>
             <div
               onDragOver={e => { e.preventDefault(); setIsDragOver(true) }}
               onDragLeave={e => { e.preventDefault(); setIsDragOver(false) }}
@@ -189,7 +189,7 @@ export default function BulkUploadPopup({ eventId, onClose, onUploadComplete }: 
               {droppedFiles.length > 0 ? (
                 <div>
                   <p className="text-sm font-medium text-gray-700 mb-2">
-                    {droppedFiles.length} file{droppedFiles.length !== 1 ? 's' : ''} selected
+                    {droppedFiles.length} bestand{droppedFiles.length !== 1 ? 'en' : ''} geselecteerd
                   </p>
                   <div className="text-xs text-gray-500 space-y-1 max-h-20 overflow-y-auto">
                     {droppedFiles.map((file, index) => (
@@ -202,13 +202,13 @@ export default function BulkUploadPopup({ eventId, onClose, onUploadComplete }: 
                     className="text-red-600 hover:text-red-700 text-xs mt-2"
                     disabled={isUploading}
                   >
-                    Clear files
+                    Bestanden wissen
                   </button>
                 </div>
               ) : (
                 <div>
-                  <p className="text-gray-500 mb-2">Drag and drop photos or videos here</p>
-                  <p className="text-xs text-gray-400">JPG, PNG, HEIC, MP4, MOV, WebM, etc.</p>
+                  <p className="text-gray-500 mb-2">Sleep foto&apos;s of video&apos;s hierheen</p>
+                  <p className="text-xs text-gray-400">o.a. JPG, PNG, HEIC, MP4, MOV, WebM</p>
                 </div>
               )}
             </div>
@@ -217,8 +217,8 @@ export default function BulkUploadPopup({ eventId, onClose, onUploadComplete }: 
           {progress && (
             <div className="mb-4 p-3 bg-gray-100 rounded">
               <div className="flex justify-between text-sm mb-2">
-                <span>Progress: {progress.completed + progress.failed}/{progress.total}</span>
-                <span>Failed: {progress.failed}</span>
+                <span>Voortgang: {progress.completed + progress.failed}/{progress.total}</span>
+                <span>Mislukt: {progress.failed}</span>
               </div>
               <div className="w-full bg-gray-200 rounded-full h-2">
                 <div
@@ -227,7 +227,7 @@ export default function BulkUploadPopup({ eventId, onClose, onUploadComplete }: 
                 />
               </div>
               {progress.currentFile && (
-                <p className="text-xs text-gray-600 mt-1 truncate">Current: {progress.currentFile}</p>
+                <p className="text-xs text-gray-600 mt-1 truncate">Huidig: {progress.currentFile}</p>
               )}
             </div>
           )}
@@ -243,10 +243,10 @@ export default function BulkUploadPopup({ eventId, onClose, onUploadComplete }: 
               {isUploading ? (
                 <div className="flex items-center gap-2">
                   <Spinner size="sm" />
-                  Uploading...
+                  Uploaden...
                 </div>
               ) : (
-                'Upload'
+                'Uploaden'
               )}
             </button>
             <button
@@ -255,7 +255,7 @@ export default function BulkUploadPopup({ eventId, onClose, onUploadComplete }: 
               onClick={onClose}
               disabled={isUploading}
             >
-              Cancel
+              Annuleren
             </button>
           </div>
         </form>

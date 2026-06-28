@@ -18,14 +18,14 @@ export function getMediaKind(file: File): MediaKind | null {
 export function getUploadValidationError(file: File): string | null {
   const kind = getMediaKind(file)
   if (!kind) {
-    return 'Please choose a photo or video (JPEG, PNG, MP4, MOV, etc.).'
+    return 'Kies een foto of video (JPEG, PNG, MP4, MOV, enz.).'
   }
   const maxBytes = kind === 'video' ? MAX_VIDEO_BYTES : MAX_IMAGE_BYTES
   if (file.size > maxBytes) {
     if (kind === 'video') {
-      return 'Video is too large (max 500 MB).'
+      return 'Video is te groot (max. 500 MB).'
     }
-    return 'Photo is too large (max 20 MB). Try a smaller image or reduce camera quality.'
+    return 'Foto is te groot (max. 20 MB). Probeer een kleinere afbeelding of lagere camerakwaliteit.'
   }
   return null
 }
@@ -33,7 +33,7 @@ export function getUploadValidationError(file: File): string | null {
 export function getVideoCompatibilityWarning(file: File): string | null {
   if (getMediaKind(file) !== 'video') return null
   if (RISKY_VIDEO_EXT.test(file.name) || RISKY_VIDEO_MIME.test(file.type)) {
-    return 'This format may not play on your TV browser. MP4 (H.264) is most reliable.'
+    return 'Dit formaat werkt mogelijk niet in je TV-browser. MP4 (H.264) is het meest betrouwbaar.'
   }
   return null
 }

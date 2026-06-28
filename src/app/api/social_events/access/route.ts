@@ -21,7 +21,7 @@ export async function POST(req: NextRequest) {
     if (eventId) {
       const ok = await verifyEventAccess(eventId, code)
       if (!ok) {
-        return NextResponse.json({ error: 'Invalid event or access code' }, { status: 403 })
+        return NextResponse.json({ error: 'Ongeldige feestlink of toegangscode' }, { status: 403 })
       }
 
       const { prisma } = await import('@/lib/prisma')
@@ -36,7 +36,7 @@ export async function POST(req: NextRequest) {
         },
       })
       if (!event) {
-        return NextResponse.json({ error: 'Invalid event or access code' }, { status: 403 })
+        return NextResponse.json({ error: 'Ongeldige feestlink of toegangscode' }, { status: 403 })
       }
 
       return NextResponse.json({
@@ -50,7 +50,7 @@ export async function POST(req: NextRequest) {
     if (slug) {
       const verified = await verifyEventAccessBySlug(slug, code)
       if (!verified) {
-        return NextResponse.json({ error: 'Invalid event or access code' }, { status: 403 })
+        return NextResponse.json({ error: 'Ongeldige feestlink of toegangscode' }, { status: 403 })
       }
       return NextResponse.json({
         ok: true,
@@ -60,9 +60,9 @@ export async function POST(req: NextRequest) {
       })
     }
 
-    return NextResponse.json({ error: 'eventId or slug is required' }, { status: 400 })
+    return NextResponse.json({ error: 'eventId of slug is verplicht' }, { status: 400 })
   } catch (error) {
     console.error('Error verifying event access:', error)
-    return NextResponse.json({ error: 'Failed to verify access' }, { status: 500 })
+    return NextResponse.json({ error: 'Kon toegang niet verifiëren' }, { status: 500 })
   }
 }

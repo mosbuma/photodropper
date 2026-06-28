@@ -13,7 +13,7 @@ export async function GET(req: NextRequest) {
     const photoId = searchParams.get('photoId')
 
     if (!eventId) {
-      return NextResponse.json({ error: 'eventId is required' }, { status: 400 })
+      return NextResponse.json({ error: 'eventId is verplicht' }, { status: 400 })
     }
 
     const where: { eventId: string; photoId?: string } = { eventId }
@@ -29,7 +29,7 @@ export async function GET(req: NextRequest) {
     return NextResponse.json(comments)
   } catch (error) {
     console.error('Error fetching comments:', error)
-    return NextResponse.json({ error: 'Failed to fetch comments' }, { status: 500 })
+    return NextResponse.json({ error: 'Kon reacties niet laden' }, { status: 500 })
   }
 }
 
@@ -60,7 +60,7 @@ export async function POST(req: NextRequest) {
     return NextResponse.json(comment)
   } catch (error) {
     console.error('Error creating comment:', error)
-    return NextResponse.json({ error: 'Failed to create comment' }, { status: 500 })
+    return NextResponse.json({ error: 'Kon reactie niet aanmaken' }, { status: 500 })
   }
 }
 
@@ -68,13 +68,13 @@ export async function POST(req: NextRequest) {
 export async function PUT(req: NextRequest) {
   try {
     const session = await getServerSession(authOptions)
-    if (!session) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
+    if (!session) return NextResponse.json({ error: 'Niet geautoriseerd' }, { status: 401 })
     
     const body = await req.json()
     const { id, ...rest } = body
     if (!id) {
       console.log(`[PUT] id is missing`)
-      return NextResponse.json({ error: 'Missing id' }, { status: 400 })
+      return NextResponse.json({ error: 'Id ontbreekt' }, { status: 400 })
     }
     
     const parse = commentSchema.partial().safeParse(rest)
@@ -91,7 +91,7 @@ export async function PUT(req: NextRequest) {
     return NextResponse.json(comment)
   } catch (error) {
     console.error('Error updating comment:', error)
-    return NextResponse.json({ error: 'Failed to update comment' }, { status: 500 })
+    return NextResponse.json({ error: 'Kon reactie niet bijwerken' }, { status: 500 })
   }
 }
 
@@ -99,16 +99,16 @@ export async function PUT(req: NextRequest) {
 export async function DELETE(req: NextRequest) {
   try {
     const session = await getServerSession(authOptions)
-    if (!session) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
+    if (!session) return NextResponse.json({ error: 'Niet geautoriseerd' }, { status: 401 })
     
     const { id } = await req.json()
-    if (!id) return NextResponse.json({ error: 'Missing id' }, { status: 400 })
+    if (!id) return NextResponse.json({ error: 'Id ontbreekt' }, { status: 400 })
     
     await prisma.comment.delete({ where: { id } })
     
     return NextResponse.json({ success: true })
   } catch (error) {
     console.error('Error deleting comment:', error)
-    return NextResponse.json({ error: 'Failed to delete comment' }, { status: 500 })
+    return NextResponse.json({ error: 'Kon reactie niet verwijderen' }, { status: 500 })
   }
 } 

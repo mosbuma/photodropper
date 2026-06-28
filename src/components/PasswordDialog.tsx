@@ -250,9 +250,9 @@ export default function PasswordDialog({
         <hr className="my-6 border-gray-300" />
 
         <div>
-          <h3 className="text-lg font-semibold mb-2">Admin</h3>
+          <h3 className="text-lg font-semibold mb-2">Beheer</h3>
           <p className="text-sm text-gray-600 mb-4">
-            Beheerders loggen in om events te beheren en de slideshow te bedienen.
+            Beheerders loggen in om feesten te beheren en de slideshow te bedienen.
           </p>
           <div className="flex space-x-3">
             <button
@@ -260,7 +260,7 @@ export default function PasswordDialog({
               onClick={handleAdminLogin}
               className="flex-1 bg-blue-600 hover:bg-blue-700 text-white py-2 px-4 rounded font-medium transition"
             >
-              ADMIN LOGIN
+              ADMIN INLOGGEN
             </button>
             <button
               type="button"

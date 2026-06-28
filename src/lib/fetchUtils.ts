@@ -8,10 +8,10 @@ import {
 
 export async function getResponseErrorMessage(
   response: Response,
-  fallback = 'Upload failed'
+  fallback = 'Upload mislukt'
 ): Promise<string> {
   if (response.status === 413) {
-    return 'File is too large to upload. Try a smaller file or reduce camera quality.'
+    return 'Bestand is te groot om te uploaden. Probeer een kleiner bestand of lagere camerakwaliteit.'
   }
 
   const text = await response.text()
@@ -23,7 +23,7 @@ export async function getResponseErrorMessage(
     const data = JSON.parse(text) as { error?: string }
     return data.error || `${fallback} (${response.status})`
   } catch {
-    return `${fallback} (${response.status}). Please try again.`
+    return `${fallback} (${response.status}). Probeer het opnieuw.`
   }
 }
 

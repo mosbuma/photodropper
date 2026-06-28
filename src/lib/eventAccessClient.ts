@@ -23,7 +23,7 @@ export async function verifyAndGrantEventAccess(input: {
   if (!response.ok) {
     return {
       ok: false,
-      error: typeof data.error === 'string' ? data.error : 'Invalid event or access code',
+      error: typeof data.error === 'string' ? data.error : 'Ongeldige feestlink of toegangscode',
     }
   }
 

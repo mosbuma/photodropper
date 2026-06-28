@@ -11,10 +11,15 @@ import WelcomePopup, { HelpButton } from '@/components/action/WelcomePopup'
 import { shouldShowWelcome } from '@/lib/welcomeStorage'
 import { verifyAndGrantEventAccess } from '@/lib/eventAccessClient'
 import { getEventAccessCode, hasEventAccess } from '@/lib/eventAccessStorage'
+import { withDevTickerComments } from '@/lib/devTickerComment'
+import { useSlideshowCompactUI } from '@/lib/useIsMobile'
 import MediaDisplay from '@/components/display/MediaDisplay'
 import QRCode from '@/components/display/QRCode'
 import MetadataDisplay from '@/components/display/MetadataDisplay'
 import Ticker from '@/components/display/Ticker'
+import MobileSlideshowBar from '@/components/display/MobileSlideshowBar'
+import UploadPhotoPopup from '@/components/action/UploadPhotoPopup'
+import CommentPopup from '@/components/action/CommentPopup'
 import PhotoCommentBox from '@/components/display/PhotoCommentBox'
 import EventCommentBubble from '@/components/display/EventCommentBubble'
 
@@ -44,6 +49,10 @@ export default function Home() {
   const [persistReady, setPersistReady] = useState(
     () => persistor.getState().bootstrapped
   )
+  const [showUpload, setShowUpload] = useState(false)
+  const [showPhotoComment, setShowPhotoComment] = useState(false)
+  const [flagging, setFlagging] = useState(false)
+  const compactUI = useSlideshowCompactUI()
 
   useEffect(() => {
     if (persistReady) return
@@ -251,10 +260,10 @@ export default function Home() {
     advanceSlide()
   }
 
-  // Click handler to open admin dialog when event is active
+  // Click handler to open admin dialog when event is active (desktop / TV)
   const handlePageClick = () => {
-    const show = !activeEventId || !showPasswordDialog;
-
+    if (compactUI && activeEventId && hasEventAccess(activeEventId)) return
+    const show = !activeEventId || !showPasswordDialog
     setShowPasswordDialog(show)
   }
 
@@ -274,7 +283,11 @@ export default function Home() {
   const slideshowUnlocked = Boolean(activeEventId && hasEventAccess(activeEventId))
 
   // Get current photo and comments
-  const photoComments = currentPhoto?.comments || []
+  const photoComments = withDevTickerComments(
+    currentPhoto?.comments || [],
+    currentPhoto?.photoId || '',
+    activeEventId || ''
+  )
   const eventComments = currentPlaylist?.eventCommentStream || []
 
   // Map comments to expected type for bubble components
@@ -286,6 +299,28 @@ export default function Home() {
     ...c,
     commenterName: c.commenterName ?? undefined
   }))
+
+  const handleFlagNotOk = async () => {
+    const photoId = currentPhoto?.photoId
+    if (!photoId || !slideshowAccessCode || flagging) return
+    if (!window.confirm('Deze foto of video verbergen van het scherm?')) return
+
+    setFlagging(true)
+    try {
+      const response = await fetch(`/api/photos/${photoId}/flag-not-ok`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ accessCode: slideshowAccessCode }),
+      })
+      if (!response.ok) {
+        alert('Kon niet verbergen. Probeer het opnieuw.')
+      }
+    } catch {
+      alert('Kon niet verbergen. Probeer het opnieuw.')
+    } finally {
+      setFlagging(false)
+    }
+  }
 
   // console.log(`[Home] currentPlaylist: ${JSON.stringify(currentPlaylist, null, 2)}`)
   // console.log(`[Home] currentPhotoIndex: ${JSON.stringify(currentPhotoIndex, null, 2)}`)
@@ -308,7 +343,7 @@ export default function Home() {
         <div className="absolute inset-0 bg-black bg-opacity-75 flex items-center justify-center z-50">
           <div className="text-white text-center">
             <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-white mx-auto mb-4"></div>
-            <p className="text-lg">Loading event...</p>
+            <p className="text-lg">Feest laden...</p>
           </div>
         </div>
       )}
@@ -320,11 +355,11 @@ export default function Home() {
         <div className="h-screen bg-black flex items-center justify-center">
           <div className="text-white text-center">
             <h2 className="text-2xl font-bold mb-2">
-              {slideshowUnlocked ? 'No Photos or Videos' : 'Feesttoegang vereist'}
+              {slideshowUnlocked ? 'Geen foto\'s of video\'s' : 'Feesttoegang vereist'}
             </h2>
             <p className="text-gray-400">
               {slideshowUnlocked
-                ? 'Upload media to get started!'
+                ? 'Upload foto\'s of video\'s om te beginnen!'
                 : 'Open je uitnodigingslink of log in met feestnaam en code.'}
             </p>
           </div>
@@ -333,7 +368,7 @@ export default function Home() {
 
       {slideshowUnlocked && (
       <>
-      {/* QR Code - Top Left (always visible) */}
+      {!compactUI && (
       <div className="absolute top-4 left-4 z-10">
         <QRCode 
           photoId={currentPhoto?.photoId || ''}
@@ -342,8 +377,9 @@ export default function Home() {
           large={true}
         />
       </div>
+      )}
 
-      {/* Help + metadata - Top Right */}
+      {!compactUI && (
       <div className="absolute top-4 right-4 z-20 flex flex-col items-end gap-2">
         {activeEventId && welcomeEvent && (
           <HelpButton
@@ -361,6 +397,50 @@ export default function Home() {
           />
         )}
       </div>
+      )}
+
+      {compactUI && currentPlaylist?.commentStyle === 'TICKER' && (
+        <div className="absolute top-1 right-1 z-20 max-w-[55vw]">
+          <MetadataDisplay 
+            dateTaken={currentPhoto?.dateTaken || null}
+            location={currentPhoto?.location || null}
+            compact
+          />
+        </div>
+      )}
+
+      {/* Mobile action bar */}
+      {currentPhoto?.photoUrl && activeEventId && (
+        <MobileSlideshowBar
+          onUpload={() => setShowUpload(true)}
+          onComment={() => setShowPhotoComment(true)}
+          onFlagNotOk={handleFlagNotOk}
+          onHelp={() => {
+            setWelcomePersistDismiss(false)
+            setShowWelcome(true)
+          }}
+          showComment={currentPlaylist?.enablePhotoComments !== false}
+          flagging={flagging}
+        />
+      )}
+
+      {showUpload && activeEventId && (
+        <UploadPhotoPopup
+          eventId={activeEventId}
+          eventName={welcomeEvent?.name}
+          accessCode={slideshowAccessCode}
+          onClose={() => setShowUpload(false)}
+        />
+      )}
+      {showPhotoComment && activeEventId && currentPhoto?.photoId && (
+        <CommentPopup
+          eventId={activeEventId}
+          photoId={currentPhoto.photoId}
+          type="photo"
+          accessCode={slideshowAccessCode}
+          onClose={() => setShowPhotoComment(false)}
+        />
+      )}
 
       {/* Ticker or ComicBook Comments - Bottom */}
       {currentPlaylist?.commentStyle === 'TICKER' ? (

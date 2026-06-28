@@ -55,7 +55,7 @@ export default function WelcomePopup({
           <p className="font-semibold text-gray-900">Zo werkt het:</p>
           <ul className="list-disc list-inside space-y-1.5 pl-1">
             <li>
-              <strong>Upload</strong> — deel een foto of video vanaf je telefoon.
+              <strong>Uploaden</strong> — deel een foto of video vanaf je telefoon.
             </li>
             <li>
               <strong>QR-code</strong> — op het TV-scherm staat een QR-code. Scan die om

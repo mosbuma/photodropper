@@ -12,8 +12,8 @@ export default function ImageDisplay() {
     return (
       <div className="min-h-screen bg-black flex items-center justify-center">
         <div className="text-white text-center">
-          <h2 className="text-2xl font-bold mb-2">No Photos</h2>
-          <p className="text-gray-400">Upload some photos to get started!</p>
+          <h2 className="text-2xl font-bold mb-2">Geen foto&apos;s</h2>
+          <p className="text-gray-400">Upload foto&apos;s om te beginnen!</p>
         </div>
       </div>
     )
@@ -27,7 +27,7 @@ export default function ImageDisplay() {
         {/* eslint-disable-next-line @next/next/no-img-element */}
         <img
           src={photoUrl}
-          alt={`Photo ${currentPhotoIndex}`}
+          alt={`Foto ${currentPhotoIndex + 1}`}
           className="w-full h-full object-contain"
         />
         

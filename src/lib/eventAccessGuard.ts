@@ -11,7 +11,7 @@ export async function requireGuestEventAccess(
   if (session) return null
 
   if (!accessCode || !(await verifyEventAccess(eventId, accessCode))) {
-    return NextResponse.json({ error: 'Invalid event access code' }, { status: 403 })
+    return NextResponse.json({ error: 'Ongeldige toegangscode' }, { status: 403 })
   }
 
   return null

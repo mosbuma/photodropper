@@ -64,13 +64,13 @@ export default function ManagementPage() {
   }, [photos.length, totalPhotoPages, photoPage]);
 
   const tabs = useMemo(() => [
-    { id: 'events', label: 'Events' },
+    { id: 'events', label: 'Feesten' },
     ...(events.length > 0 ? [
-      { id: 'photos', label: 'Photos' },
-      { id: 'comments', label: 'Comments' },
-      { id: 'playlist', label: 'Playlist' }
+      { id: 'photos', label: "Foto's" },
+      { id: 'comments', label: 'Reacties' },
+      { id: 'playlist', label: 'Afspeellijst' }
     ] : []),
-    { id: 'settings', label: 'Settings' }
+    { id: 'settings', label: 'Instellingen' }
   ], [events.length])
 
   const handleClose = () => {
@@ -88,7 +88,7 @@ export default function ManagementPage() {
 
   const handleCreateEvent = async () => {
     if (!newEventName.trim()) {
-      setNewEventError('Event name is required')
+      setNewEventError('Feestnaam is verplicht')
       return
     }
     setCreatingEvent(true)
@@ -110,13 +110,13 @@ export default function ManagementPage() {
         dispatch(setActiveEvent(newEvent.id))
         grantEventAccess(newEvent.id, newEvent.accessCode)
         setShowNewEventModal(false)
-        alert(`Event created.\n\nJoin link:\n${window.location.origin}${buildJoinPath(newEvent.slug, newEvent.accessCode)}\n\nAccess code: ${newEvent.accessCode}`)
+        alert(`Feest aangemaakt.\n\nDeel-link:\n${window.location.origin}${buildJoinPath(newEvent.slug, newEvent.accessCode)}\n\nToegangscode: ${newEvent.accessCode}`)
       } else {
         const error = await response.json()
-        setNewEventError(error.error || 'Failed to create event')
+        setNewEventError(error.error || 'Kon feest niet aanmaken')
       }
     } catch {
-      setNewEventError('Error creating event')
+      setNewEventError('Fout bij aanmaken feest')
     } finally {
       setCreatingEvent(false)
     }
@@ -128,12 +128,12 @@ export default function ManagementPage() {
       grantEventAccess(eventId, event.accessCode)
     }
     dispatch(setActiveEvent(eventId))
-    alert(`Event "${event?.name || eventId}" set as active`)
+    alert(`Feest "${event?.name || eventId}" ingesteld als actief`)
   }
 
   const handleBulkUpload = () => {
     if (!activeEventId) {
-      alert('Please select an event first')
+      alert('Selecteer eerst een feest')
       return
     }
     setShowBulkUpload(true)
@@ -157,14 +157,14 @@ export default function ManagementPage() {
           dispatch(setActiveEvent(null))
         }
         
-        alert('Event deleted successfully')
+        alert('Feest succesvol verwijderd')
       } else {
         const error = await response.json()
-        alert(`Failed to delete event: ${error.error}`)
+        alert(`Kon feest niet verwijderen: ${error.error}`)
       }
     } catch (error) {
       console.error('Error deleting event:', error)
-      alert('Error deleting event')
+      alert('Fout bij verwijderen feest')
     } finally {
       setDeletingEvent(false)
       setDeleteEvent(null)
@@ -172,7 +172,7 @@ export default function ManagementPage() {
   }
 
   const handleCleanupPhotos = async () => {
-    if (!confirm('This will delete all photo files that are not linked to any event. Continue?')) {
+    if (!confirm('Dit verwijdert alle fotobestanden die niet aan een feest gekoppeld zijn. Doorgaan?')) {
       return
     }
 
@@ -187,16 +187,16 @@ export default function ManagementPage() {
         const result = await response.json()
         let summary = ''
         if (result.summary) {
-          summary += `- Files on disk: ${result.summary.totalFilesOnDisk}\n- Linked in database: ${result.summary.linkedFilesInDatabase}\n- Orphaned files found: ${result.summary.orphanedFilesFound}\n- Files deleted: ${result.summary.filesDeleted}\n- Errors: ${result.summary.filesWithErrors}`
+          summary += `- Bestanden op schijf: ${result.summary.totalFilesOnDisk}\n- Gekoppeld in database: ${result.summary.linkedFilesInDatabase}\n- Verweesde bestanden gevonden: ${result.summary.orphanedFilesFound}\n- Bestanden verwijderd: ${result.summary.filesDeleted}\n- Fouten: ${result.summary.filesWithErrors}`
         }
         setCleanupSummary(summary)
       } else {
         const error = await response.json()
-        alert(`Cleanup failed: ${error.error}`)
+        alert(`Opruimen mislukt: ${error.error}`)
       }
     } catch (error) {
       console.error('Error cleaning up photos:', error)
-      alert('Error cleaning up photos')
+      alert("Fout bij opruimen foto's")
     } finally {
       setCleaning(false)
     }
@@ -246,7 +246,7 @@ export default function ManagementPage() {
           visible: true,
         }),
       })
-      if (!response.ok) throw new Error('Failed to approve photo')
+      if (!response.ok) throw new Error('Kon foto niet goedkeuren')
       const updated = await response.json()
       setPhotos(prev => prev.map(p => (p.id === photo.id ? { ...p, ...updated } : p)))
     } catch (error) {
@@ -268,7 +268,7 @@ export default function ManagementPage() {
           visible: false,
         }),
       })
-      if (!response.ok) throw new Error('Failed to flag photo')
+      if (!response.ok) throw new Error('Kon foto niet markeren')
       const updated = await response.json()
       setPhotos(prev => prev.map(p => (p.id === photo.id ? { ...p, ...updated } : p)))
     } catch (error) {
@@ -412,10 +412,10 @@ export default function ManagementPage() {
         setEditEvent(null)
       } else {
         const error = await response.json()
-        setEditEventError(error.error || 'Failed to update event')
+        setEditEventError(error.error || 'Kon feest niet bijwerken')
       }
     } catch {
-      setEditEventError('Failed to update event')
+      setEditEventError('Kon feest niet bijwerken')
     } finally {
       setSavingEvent(false)
     }
@@ -430,7 +430,7 @@ export default function ManagementPage() {
 
   const openGuestActionPage = (event: SocialEvent) => {
     if (!event.accessCode) {
-      alert('Join link unavailable: run database/migrations/20260628_add_event_access.sql on MariaDB, then refresh this page.')
+      alert('Deel-link niet beschikbaar: voer database/migrations/20260628_add_event_access.sql uit op MariaDB en ververs deze pagina.')
       return
     }
     window.location.href = buildActionPath(event.id, event.accessCode)
@@ -438,21 +438,21 @@ export default function ManagementPage() {
 
   const copyJoinLink = async (event: SocialEvent) => {
     if (!event.slug || !event.accessCode) {
-      alert('Join link unavailable: run database/migrations/20260628_add_event_access.sql on MariaDB, then refresh this page.')
+      alert('Deel-link niet beschikbaar: voer database/migrations/20260628_add_event_access.sql uit op MariaDB en ververs deze pagina.')
       return
     }
     const url = `${window.location.origin}${buildJoinPath(event.slug, event.accessCode)}`
     try {
       await navigator.clipboard.writeText(url)
-      alert('Join link copied to clipboard')
+      alert('Deel-link gekopieerd naar klembord')
     } catch {
-      prompt('Copy this join link:', url)
+      prompt('Kopieer deze deel-link:', url)
     }
   }
 
   const handleRegenerateAccessCode = async () => {
     if (!editEvent) return
-    if (!confirm('Generate a new access code? Old invite links will stop working.')) return
+    if (!confirm('Nieuwe toegangscode genereren? Oude uitnodigingslinks werken dan niet meer.')) return
     setRegeneratingAccessCode(true)
     setEditEventError(null)
     try {
@@ -466,15 +466,15 @@ export default function ManagementPage() {
       })
       if (!response.ok) {
         const error = await response.json()
-        setEditEventError(error.error || 'Failed to regenerate access code')
+        setEditEventError(error.error || 'Kon toegangscode niet vernieuwen')
         return
       }
       const updated = await response.json()
       setEvents(events => events.map(e => e.id === updated.id ? updated : e))
       setEditEventAccessCode(updated.accessCode)
-      alert(`New access code: ${updated.accessCode}`)
+      alert(`Nieuwe toegangscode: ${updated.accessCode}`)
     } catch {
-      setEditEventError('Failed to regenerate access code')
+      setEditEventError('Kon toegangscode niet vernieuwen')
     } finally {
       setRegeneratingAccessCode(false)
     }
@@ -486,7 +486,7 @@ export default function ManagementPage() {
       <div className="min-h-screen bg-gray-900 text-white flex items-center justify-center">
         <div className="text-center">
           <div className="inline-block animate-spin rounded-full h-8 w-8 border-b-2 border-white mb-4"></div>
-          <p>Checking authentication...</p>
+          <p>Authenticatie controleren...</p>
         </div>
       </div>
     )
@@ -497,12 +497,12 @@ export default function ManagementPage() {
     return (
       <div className="min-h-screen bg-gray-900 text-white flex items-center justify-center">
         <div className="text-center">
-          <p>Please log in to access the management panel.</p>
+          <p>Log in om het beheerpaneel te openen.</p>
           <button 
             onClick={() => signIn()}
             className="mt-4 bg-blue-600 hover:bg-blue-700 px-4 py-2 rounded"
           >
-            Sign In
+            Inloggen
           </button>
         </div>
       </div>
@@ -515,7 +515,7 @@ export default function ManagementPage() {
       <div className="bg-gray-800 border-b border-gray-700">
         <div className="container mx-auto px-4 py-4">
           <div className="flex items-center justify-between">
-            <h1 className="text-2xl font-bold">Photodropper Management</h1>
+            <h1 className="text-2xl font-bold">Photodropper Beheer</h1>
             
             <div className="flex items-center space-x-4">
               <button
@@ -523,7 +523,7 @@ export default function ManagementPage() {
                 disabled={loading}
                 className="bg-blue-600 hover:bg-blue-700 disabled:bg-gray-600 px-4 py-2 rounded"
               >
-                New Event
+                Nieuw feest
               </button>
               
 
@@ -533,7 +533,7 @@ export default function ManagementPage() {
                 onChange={(e) => dispatch(setActiveEvent(e.target.value))}
                 className="bg-gray-700 border border-gray-600 rounded px-3 py-2"
               >
-                <option value="">Select Event</option>
+                <option value="">Selecteer feest</option>
                 {events.map((event: SocialEvent) => (
                   <option key={event.id} value={event.id}>
                     {event.name}
@@ -545,7 +545,7 @@ export default function ManagementPage() {
                 onClick={handleClose}
                 className="bg-gray-600 hover:bg-gray-700 px-4 py-2 rounded"
               >
-                Close
+                Sluiten
               </button>
             </div>
           </div>
@@ -578,13 +578,13 @@ export default function ManagementPage() {
         {loading && (
           <div className="text-center py-8">
             <div className="inline-block animate-spin rounded-full h-8 w-8 border-b-2 border-white"></div>
-            <p className="mt-2">Loading...</p>
+            <p className="mt-2">Laden...</p>
           </div>
         )}
 
         {!loading && activeTab === 'events' && (
           <div className="space-y-4">
-            <h2 className="text-xl font-semibold mb-4">Events</h2>
+            <h2 className="text-xl font-semibold mb-4">Feesten</h2>
             {events.length > 0 ? (
               <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-3">
                 {events.map((event: SocialEvent) => (
@@ -596,26 +596,26 @@ export default function ManagementPage() {
                           onClick={() => handleSetActiveEvent(event.id)}
                           className="text-blue-400 hover:text-blue-300 text-sm"
                         >
-                          Set Active
+                          Actief maken
                         </button>
                         <button className="text-gray-400 hover:text-gray-300 text-sm" onClick={() => handleEditEvent(event)}>
-                          Edit
+                          Bewerken
                         </button>
                         <button
                           onClick={() => setDeleteEvent(event)}
                           className="text-red-400 hover:text-red-300 text-sm"
                         >
-                          Delete
+                          Verwijderen
                         </button>
                       </div>
                     </div>
                     <p className="text-sm text-gray-400">
-                      Created: {new Date(event.createdAt).toLocaleDateString()}
+                      Aangemaakt: {new Date(event.createdAt).toLocaleDateString()}
                     </p>
                     <p className="text-xs text-gray-500 mt-2 break-all">
                       Link: {event.slug && event.accessCode
                         ? buildJoinPath(event.slug, event.accessCode)
-                        : 'Migration required — slug/code missing'}
+                        : 'Migratie vereist — slug/code ontbreekt'}
                     </p>
                     <p className="text-xs text-gray-500">
                       Code: {event.accessCode || '—'}
@@ -625,7 +625,7 @@ export default function ManagementPage() {
                         onClick={() => copyJoinLink(event)}
                         className="text-xs text-blue-400 hover:text-blue-300"
                       >
-                        Copy join link
+                        Deel-link kopiëren
                       </button>
                       <button
                         onClick={() => openGuestActionPage(event)}
@@ -636,7 +636,7 @@ export default function ManagementPage() {
                     </div>
                     {activeEventId === event.id && (
                       <span className="inline-block bg-green-600 text-white text-xs px-2 py-1 rounded mt-2">
-                        Active
+                        Actief
                       </span>
                     )}
                   </div>
@@ -645,14 +645,14 @@ export default function ManagementPage() {
             ) : (
               <div className="text-center py-12">
                 <div className="bg-gray-800 rounded-lg p-8 border border-gray-700">
-                  <h3 className="text-lg font-medium text-gray-300 mb-2">No events yet</h3>
-                  <p className="text-gray-400 mb-4">Create your first event to start</p>
+                  <h3 className="text-lg font-medium text-gray-300 mb-2">Nog geen feesten</h3>
+                  <p className="text-gray-400 mb-4">Maak je eerste feest om te beginnen</p>
                   <button
                     onClick={handleNewEvent}
                     disabled={loading}
                     className="bg-blue-600 hover:bg-blue-700 disabled:bg-gray-600 px-6 py-2 rounded"
                   >
-                    Create Event
+                    Feest aanmaken
                   </button>
                 </div>
               </div>
@@ -663,14 +663,14 @@ export default function ManagementPage() {
         {!loading && activeTab === 'photos' && (
           <div className="space-y-4">
             <div className="flex items-center justify-between">
-              <h2 className="text-xl font-semibold">Photos</h2>
+              <h2 className="text-xl font-semibold">Foto's</h2>
               <div className="flex space-x-2">
                 {activeEventId && (
                   <button 
                     onClick={handleBulkUpload}
                     className="bg-green-600 hover:bg-green-700 px-4 py-2 rounded"
                   >
-                    Bulk Upload
+                    Bulk upload
                   </button>
                 )}
               </div>
@@ -781,7 +781,7 @@ export default function ManagementPage() {
                         onClick={() => setPhotoPage(p => Math.max(1, p - 1))}
                         disabled={photoPage === 1}
                       >
-                        Previous
+                        Vorige
                       </button>
                       {Array.from({ length: totalPhotoPages }, (_, i) => i + 1).map(pageNum => (
                         <button
@@ -797,7 +797,7 @@ export default function ManagementPage() {
                         onClick={() => setPhotoPage(p => Math.min(totalPhotoPages, p + 1))}
                         disabled={photoPage === totalPhotoPages}
                       >
-                        Next
+                        Volgende
                       </button>
                     </div>
                   )}
@@ -805,19 +805,19 @@ export default function ManagementPage() {
               ) : (
                 <div className="text-center py-12">
                   <div className="bg-gray-800 rounded-lg p-8 border border-gray-700">
-                    <h3 className="text-lg font-medium text-gray-300 mb-2">No photos yet</h3>
-                    <p className="text-gray-400 mb-4">Add photos to this event</p>
+                    <h3 className="text-lg font-medium text-gray-300 mb-2">Nog geen foto's</h3>
+                    <p className="text-gray-400 mb-4">Voeg foto's toe aan dit feest</p>
                     <button
                       onClick={handleBulkUpload}
                       className="bg-green-600 hover:bg-green-700 px-6 py-2 rounded"
                     >
-                      Bulk Upload
+                      Bulk upload
                     </button>
                   </div>
                 </div>
               )
             ) : (
-              <p className="text-gray-400">Select an event to view photos</p>
+              <p className="text-gray-400">Selecteer een feest om foto's te bekijken</p>
             )}
             {/* Edit popup */}
             {editPhoto && (
@@ -834,8 +834,8 @@ export default function ManagementPage() {
               <div className="fixed inset-0 bg-black bg-opacity-60 flex items-center justify-center z-50">
                 <div className="bg-white text-black rounded-lg p-6 w-full max-w-xs relative">
                   <button className="absolute top-2 right-2 text-gray-500" onClick={() => setDeletePhoto(null)}>&times;</button>
-                  <h2 className="text-xl font-bold mb-4">Delete Photo?</h2>
-                  <p className="mb-4">Are you sure you want to delete this photo?</p>
+                  <h2 className="text-xl font-bold mb-4">Foto verwijderen?</h2>
+                  <p className="mb-4">Weet je zeker dat je deze foto wilt verwijderen?</p>
                   <div className="flex gap-2">
                     <button className="bg-red-600 hover:bg-red-700 text-white px-4 py-2 rounded" disabled={deleting} onClick={async () => {
                       setDeleting(true)
@@ -850,8 +850,8 @@ export default function ManagementPage() {
                       } finally {
                         setDeleting(false)
                       }
-                    }}>Delete</button>
-                    <button className="bg-gray-400 hover:bg-gray-500 text-white px-4 py-2 rounded" onClick={() => setDeletePhoto(null)}>Cancel</button>
+                    }}>Verwijderen</button>
+                    <button className="bg-gray-400 hover:bg-gray-500 text-white px-4 py-2 rounded" onClick={() => setDeletePhoto(null)}>Annuleren</button>
                   </div>
                 </div>
               </div>
@@ -862,7 +862,7 @@ export default function ManagementPage() {
 
         {!loading && activeTab === 'comments' && (
           <div className="space-y-4">
-            <h2 className="text-xl font-semibold">Event Comments</h2>
+            <h2 className="text-xl font-semibold">Feestreacties</h2>
             {activeEventId ? (
               <div className="space-y-2">
                 {comments
@@ -873,18 +873,18 @@ export default function ManagementPage() {
                         <div>
                           <p className="font-medium">{comment.comment}</p>
                           <p className="text-sm text-gray-400">
-                            {comment.commenterName || 'Anonymous'} • {comment.createdAt!==null ? new Date(comment.createdAt).toLocaleString() : ''}
+                            {comment.commenterName || 'Anoniem'} • {comment.createdAt!==null ? new Date(comment.createdAt).toLocaleString() : ''}
                           </p>
                         </div>
                         <button className="text-gray-400 hover:text-gray-300 text-sm">
-                          Edit
+                          Bewerken
                         </button>
                       </div>
                     </div>
                   ))}
               </div>
             ) : (
-              <p className="text-gray-400">Select an event to view comments</p>
+              <p className="text-gray-400">Selecteer een feest om reacties te bekijken</p>
             )}
           </div>
         )}
@@ -893,14 +893,14 @@ export default function ManagementPage() {
           <div className="flex gap-8">
             {/* Photos Table */}
             <div className="w-1/2 overflow-x-auto">
-              <h2 className="text-lg font-semibold mb-2">Photos</h2>
+              <h2 className="text-lg font-semibold mb-2">Foto's</h2>
               <table className="min-w-full bg-gray-800 rounded-lg">
                 <thead>
                   <tr>
-                    <th className="px-4 py-2 text-left">Photo</th>
-                    <th className="px-4 py-2 text-left">Uploader</th>
-                    <th className="px-4 py-2 text-left">Comments</th>
-                    <th className="px-4 py-2 text-left">Created</th>
+                    <th className="px-4 py-2 text-left">Foto</th>
+                    <th className="px-4 py-2 text-left">Geüpload door</th>
+                    <th className="px-4 py-2 text-left">Reacties</th>
+                    <th className="px-4 py-2 text-left">Aangemaakt</th>
                   </tr>
                 </thead>
                 <tbody>
@@ -949,11 +949,11 @@ export default function ManagementPage() {
                               className="w-24 h-16 object-cover rounded"
                             />
                           </td>
-                          <td className="px-4 py-2">{photo.uploaderName || 'Anonymous'}</td>
+                          <td className="px-4 py-2">{photo.uploaderName || 'Anoniem'}</td>
                           <td className="px-4 py-2 whitespace-pre-line text-xs text-gray-300">
                             {photo.comments.length > 0
-                              ? photo.comments.map((c) => `${c.commenterName || 'Anonymous'}: ${c.comment}`).join('\n')
-                              : <span className="text-gray-500">No comments</span>}
+                              ? photo.comments.map((c) => `${c.commenterName || 'Anoniem'}: ${c.comment}`).join('\n')
+                              : <span className="text-gray-500">Geen reacties</span>}
                           </td>
                           <td className="px-4 py-2 text-xs text-gray-400">{createdDisplay}</td>
                         </tr>
@@ -964,13 +964,13 @@ export default function ManagementPage() {
             </div>
             {/* Event Comments Table */}
             <div className="w-1/2 overflow-x-auto">
-              <h2 className="text-lg font-semibold mb-2">Event Comments</h2>
+              <h2 className="text-lg font-semibold mb-2">Feestreacties</h2>
               <table className="min-w-full bg-gray-800 rounded-lg">
                 <thead>
                   <tr>
-                    <th className="px-4 py-2 text-left">Comment</th>
-                    <th className="px-4 py-2 text-left">By</th>
-                    <th className="px-4 py-2 text-left">Created</th>
+                    <th className="px-4 py-2 text-left">Reactie</th>
+                    <th className="px-4 py-2 text-left">Door</th>
+                    <th className="px-4 py-2 text-left">Aangemaakt</th>
                   </tr>
                 </thead>
                 <tbody>
@@ -993,13 +993,13 @@ export default function ManagementPage() {
                         return (
                           <tr key={idx} className="border-b border-gray-700">
                             <td className="px-4 py-2">{comment.comment}</td>
-                            <td className="px-4 py-2">{comment.commenterName || 'Anonymous'}</td>
+                            <td className="px-4 py-2">{comment.commenterName || 'Anoniem'}</td>
                             <td className="px-4 py-2 text-xs text-gray-400">{createdDisplay}</td>
                           </tr>
                         );
                       })
                   ) : (
-                    <tr><td colSpan={3} className="px-4 py-2 text-gray-500">No event comments</td></tr>
+                    <tr><td colSpan={3} className="px-4 py-2 text-gray-500">Geen feestreacties</td></tr>
                   )}
                 </tbody>
               </table>
@@ -1009,19 +1009,19 @@ export default function ManagementPage() {
 
         {!loading && activeTab === 'settings' && (
           <div className="space-y-4">
-            <h2 className="text-xl font-semibold">Settings</h2>
+            <h2 className="text-xl font-semibold">Instellingen</h2>
             <div className="space-y-4">
               <div className="bg-gray-800 rounded-lg p-4 border border-gray-700">
-                <h3 className="text-lg font-medium mb-2">File Management</h3>
+                <h3 className="text-lg font-medium mb-2">Bestandsbeheer</h3>
                 <p className="text-sm text-gray-400 mb-4">
-                  Clean up orphaned photo files that are not linked to any event.
+                  Ruim verweesde fotobestanden op die niet aan een feest gekoppeld zijn.
                 </p>
                 <button 
                   onClick={handleCleanupPhotos}
                   disabled={cleaning}
                   className="bg-orange-600 hover:bg-orange-700 disabled:bg-gray-600 px-4 py-2 rounded"
                 >
-                  {cleaning ? 'Cleaning...' : 'Cleanup Files'}
+                  {cleaning ? 'Bezig met opruimen...' : 'Bestanden opruimen'}
                 </button>
               </div>
             </div>
@@ -1034,12 +1034,12 @@ export default function ManagementPage() {
         <div className="fixed inset-0 bg-black bg-opacity-60 flex items-center justify-center z-50">
           <div className="bg-white text-black rounded-lg p-6 w-full max-w-md relative">
             <button className="absolute top-2 right-2 text-gray-500" onClick={() => setDeleteEvent(null)}>&times;</button>
-            <h2 className="text-xl font-bold mb-4">Delete Event?</h2>
+            <h2 className="text-xl font-bold mb-4">Feest verwijderen?</h2>
             <p className="mb-4">
-              Are you sure you want to delete the event &quot;<strong>{deleteEvent.name}</strong>&quot;?
+              Weet je zeker dat je het feest wilt verwijderen &quot;<strong>{deleteEvent.name}</strong>&quot;?
             </p>
             <p className="mb-4 text-sm text-gray-600">
-              This will also delete all associated photos, comments, and photo files on disk.
+              Dit verwijdert ook alle bijbehorende foto's, reacties en fotobestanden op schijf.
             </p>
             <div className="flex gap-2">
               <button 
@@ -1047,9 +1047,9 @@ export default function ManagementPage() {
                 disabled={deletingEvent} 
                 onClick={handleDeleteEvent}
               >
-                {deletingEvent ? 'Deleting...' : 'Delete Event'}
+                {deletingEvent ? 'Bezig met verwijderen...' : 'Feest verwijderen'}
               </button>
-              <button className="bg-gray-400 hover:bg-gray-500 text-white px-4 py-2 rounded" onClick={() => setDeleteEvent(null)}>Cancel</button>
+              <button className="bg-gray-400 hover:bg-gray-500 text-white px-4 py-2 rounded" onClick={() => setDeleteEvent(null)}>Annuleren</button>
             </div>
           </div>
         </div>
@@ -1059,14 +1059,14 @@ export default function ManagementPage() {
       {cleanupSummary && (
         <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50">
           <div className="bg-white text-gray-900 rounded-xl p-8 w-full max-w-md mx-4 shadow-2xl border border-gray-200" onClick={e => e.stopPropagation()}>
-            <h2 className="text-2xl font-bold mb-6 text-center">Cleanup Completed</h2>
+            <h2 className="text-2xl font-bold mb-6 text-center">Opruimen voltooid</h2>
             <pre className="whitespace-pre-wrap text-sm mb-6">{cleanupSummary}</pre>
             <div className="flex justify-center">
               <button
                 className="bg-blue-600 hover:bg-blue-700 text-white py-2 px-6 rounded font-medium transition"
                 onClick={() => setCleanupSummary(null)}
               >
-                Close
+                Sluiten
               </button>
             </div>
           </div>
@@ -1077,8 +1077,8 @@ export default function ManagementPage() {
       {editEvent && (
         <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50">
           <div className="bg-white text-gray-900 rounded-xl p-8 w-full max-w-md mx-4 shadow-2xl border border-gray-200" onClick={e => e.stopPropagation()}>
-            <h2 className="text-2xl font-bold mb-6 text-center">Edit Event</h2>
-            <label className="block text-sm font-medium mb-2">Event Name</label>
+            <h2 className="text-2xl font-bold mb-6 text-center">Feest bewerken</h2>
+            <label className="block text-sm font-medium mb-2">Feestnaam</label>
             <input
               type="text"
               className="w-full px-3 py-2 bg-white border border-gray-400 rounded text-gray-900 focus:outline-none focus:border-blue-500 mb-4"
@@ -1086,7 +1086,7 @@ export default function ManagementPage() {
               onChange={e => setEditEventName(e.target.value)}
               maxLength={100}
             />
-            <label className="block text-sm font-medium mb-2">Photo Duration (ms)</label>
+            <label className="block text-sm font-medium mb-2">Fotoduur (ms)</label>
             <input
               type="number"
               className="w-full px-3 py-2 bg-white border border-gray-400 rounded text-gray-900 focus:outline-none focus:border-blue-500 mb-2"
@@ -1096,8 +1096,8 @@ export default function ManagementPage() {
               step={100}
               onChange={e => setEditEventPhotoDuration(Number(e.target.value))}
             />
-            {!isPhotoDurationValid && <div className="text-red-500 text-xs mb-2">Photo duration must be 0 or greater.</div>}
-            <label className="block text-sm font-medium mb-2">Scroll Speed (%)</label>
+            {!isPhotoDurationValid && <div className="text-red-500 text-xs mb-2">Fotoduur moet 0 of hoger zijn.</div>}
+            <label className="block text-sm font-medium mb-2">Scrollsnelheid (%)</label>
             <input
               type="number"
               className="w-full px-3 py-2 bg-white border border-gray-400 rounded text-gray-900 focus:outline-none focus:border-blue-500 mb-2"
@@ -1107,8 +1107,8 @@ export default function ManagementPage() {
               step={1}
               onChange={e => setEditEventScrollSpeed(Number(e.target.value))}
             />
-            {!isScrollSpeedValid && <div className="text-red-500 text-xs mb-2">Scroll speed must be between 0 and 100.</div>}
-            <label className="block text-sm font-medium mb-2">Access Code</label>
+            {!isScrollSpeedValid && <div className="text-red-500 text-xs mb-2">Scrollsnelheid moet tussen 0 en 100 liggen.</div>}
+            <label className="block text-sm font-medium mb-2">Toegangscode</label>
             <div className="flex gap-2 mb-4">
               <input
                 type="text"
@@ -1123,31 +1123,31 @@ export default function ManagementPage() {
                 onClick={handleRegenerateAccessCode}
                 disabled={regeneratingAccessCode}
               >
-                {regeneratingAccessCode ? '...' : 'New code'}
+                {regeneratingAccessCode ? '...' : 'Nieuwe code'}
               </button>
             </div>
             {editEvent && (
               <p className="text-xs text-gray-500 mb-4 break-all">
-                Join link: {buildJoinPath(editEvent.slug, editEventAccessCode || editEvent.accessCode)}
+                Deel-link: {buildJoinPath(editEvent.slug, editEventAccessCode || editEvent.accessCode)}
               </p>
             )}
-            <label className="block text-sm font-medium mb-2">Comment Style</label>
+            <label className="block text-sm font-medium mb-2">Reactiestijl</label>
             <select
               className="w-full px-3 py-2 bg-white border border-gray-400 rounded text-gray-900 focus:outline-none focus:border-blue-500 mb-4"
               value={editEventCommentStyle}
               onChange={e => setEditEventCommentStyle(e.target.value as 'TICKER' | 'COMICBOOK')}
             >
-              <option value="TICKER">Ticker (classic)</option>
-              <option value="COMICBOOK">Comic Book Bubbles</option>
+              <option value="TICKER">Ticker (klassiek)</option>
+              <option value="COMICBOOK">Stripballonnen</option>
             </select>
             {editEventError && <div className="text-red-500 text-sm mb-4">{editEventError}</div>}
             <label className="block text-sm font-medium mb-2">
               <input type="checkbox" className="mr-2" checked={editEventEnablePhotoComments} onChange={e => setEditEventEnablePhotoComments(e.target.checked)} />
-              Enable Photo Comments
+              Foto-reacties inschakelen
             </label>
             <label className="block text-sm font-medium mb-2">
               <input type="checkbox" className="mr-2" checked={editEventEnableEventComments} onChange={e => setEditEventEnableEventComments(e.target.checked)} />
-              Enable Event Comments
+              Feest-reacties inschakelen
             </label>
             <div className="flex justify-center gap-4 mt-4">
               <button
@@ -1155,14 +1155,14 @@ export default function ManagementPage() {
                 onClick={handleSaveEditEvent}
                 disabled={savingEvent || !isEditEventValid}
               >
-                {savingEvent ? 'Saving...' : 'Save'}
+                {savingEvent ? 'Opslaan...' : 'Opslaan'}
               </button>
               <button
                 className="bg-gray-300 hover:bg-gray-400 text-gray-900 py-2 px-6 rounded font-medium transition"
                 onClick={() => setEditEvent(null)}
                 disabled={savingEvent}
               >
-                Cancel
+                Annuleren
               </button>
             </div>
           </div>
@@ -1197,8 +1197,8 @@ export default function ManagementPage() {
       {showNewEventModal && (
         <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50">
           <div className="bg-white text-gray-900 rounded-xl p-8 w-full max-w-md mx-4 shadow-2xl border border-gray-200" onClick={e => e.stopPropagation()}>
-            <h2 className="text-2xl font-bold mb-6 text-center">Create New Event</h2>
-            <label className="block text-sm font-medium mb-2">Event Name</label>
+            <h2 className="text-2xl font-bold mb-6 text-center">Nieuw feest aanmaken</h2>
+            <label className="block text-sm font-medium mb-2">Feestnaam</label>
             <input
               type="text"
               className="w-full px-3 py-2 bg-white border border-gray-400 rounded text-gray-900 focus:outline-none focus:border-blue-500 mb-4"
@@ -1206,23 +1206,23 @@ export default function ManagementPage() {
               onChange={e => setNewEventName(e.target.value)}
               maxLength={100}
             />
-            <label className="block text-sm font-medium mb-2">Comment Style</label>
+            <label className="block text-sm font-medium mb-2">Reactiestijl</label>
             <select
               className="w-full px-3 py-2 bg-white border border-gray-400 rounded text-gray-900 focus:outline-none focus:border-blue-500 mb-4"
               value={newEventCommentStyle}
               onChange={e => setNewEventCommentStyle(e.target.value as 'TICKER' | 'COMICBOOK')}
             >
-              <option value="TICKER">Ticker (classic)</option>
-              <option value="COMICBOOK">Comic Book Bubbles</option>
+              <option value="TICKER">Ticker (klassiek)</option>
+              <option value="COMICBOOK">Stripballonnen</option>
             </select>
             {newEventError && <div className="text-red-500 text-sm mb-4">{newEventError}</div>}
             <label className="block text-sm font-medium mb-2">
               <input type="checkbox" className="mr-2" checked={newEventEnablePhotoComments} onChange={e => setNewEventEnablePhotoComments(e.target.checked)} />
-              Enable Photo Comments
+              Foto-reacties inschakelen
             </label>
             <label className="block text-sm font-medium mb-2">
               <input type="checkbox" className="mr-2" checked={newEventEnableEventComments} onChange={e => setNewEventEnableEventComments(e.target.checked)} />
-              Enable Event Comments
+              Feest-reacties inschakelen
             </label>
             <div className="flex justify-center gap-4 mt-4">
               <button
@@ -1230,14 +1230,14 @@ export default function ManagementPage() {
                 onClick={handleCreateEvent}
                 disabled={creatingEvent || !newEventName.trim()}
               >
-                {creatingEvent ? 'Creating...' : 'Create'}
+                {creatingEvent ? 'Bezig met aanmaken...' : 'Aanmaken'}
               </button>
               <button
                 className="bg-gray-300 hover:bg-gray-400 text-gray-900 py-2 px-6 rounded font-medium transition"
                 onClick={() => setShowNewEventModal(false)}
                 disabled={creatingEvent}
               >
-                Cancel
+                Annuleren
               </button>
             </div>
           </div>
@@ -1278,11 +1278,11 @@ function PhotoEditPopup({ photo, onClose, onSave }: { photo: PhotoStreamItem, on
           flaggedNotOk: meta.flaggedNotOk,
         })
       })
-      if (!res.ok) throw new Error('Failed to update photo')
+      if (!res.ok) throw new Error('Kon foto niet bijwerken')
       onSave({ ...photo, ...meta, flaggedNotOk: meta.flaggedNotOk })
       onClose()
     } catch (err) {
-      setError(err instanceof Error ? err.message : 'Failed to update photo')
+      setError(err instanceof Error ? err.message : 'Kon foto niet bijwerken')
     } finally {
       setSaving(false)
     }
@@ -1292,22 +1292,22 @@ function PhotoEditPopup({ photo, onClose, onSave }: { photo: PhotoStreamItem, on
     <div className="fixed inset-0 bg-black bg-opacity-60 flex items-center justify-center z-50">
       <div className="bg-white text-black rounded-lg p-6 w-full max-w-sm relative">
         <button className="absolute top-2 right-2 text-gray-500" onClick={onClose}>&times;</button>
-        <h2 className="text-xl font-bold mb-4">Edit Photo</h2>
+        <h2 className="text-xl font-bold mb-4">Foto bewerken</h2>
         <form onSubmit={handleSubmit}>
-          <label className="block mb-2 text-sm font-medium">Name</label>
+          <label className="block mb-2 text-sm font-medium">Naam</label>
           <input type="text" maxLength={10} className="w-full mb-3 px-3 py-2 border rounded" value={meta.uploaderName} onChange={e => setMeta(m => ({ ...m, uploaderName: e.target.value }))} />
-          <label className="block mb-2 text-sm font-medium">Location</label>
+          <label className="block mb-2 text-sm font-medium">Locatie</label>
           <input type="text" className="w-full mb-3 px-3 py-2 border rounded" value={meta.location} onChange={e => setMeta(m => ({ ...m, location: e.target.value }))} />
-          <label className="block mb-2 text-sm font-medium">Date</label>
+          <label className="block mb-2 text-sm font-medium">Datum</label>
           <input type="date" className="w-full mb-3 px-3 py-2 border rounded" value={meta.dateTaken} onChange={e => setMeta(m => ({ ...m, dateTaken: e.target.value }))} />
           <label className="flex items-center mb-4">
             <input type="checkbox" className="mr-2" checked={meta.visible} onChange={e => setMeta(m => ({ ...m, visible: e.target.checked }))} />
-            Visible
+            Zichtbaar
           </label>
           {error && <div className="text-red-600 mb-2">{error}</div>}
           <div className="flex gap-2">
-            <button type="submit" className="bg-blue-600 hover:bg-blue-700 text-white px-4 py-2 rounded" disabled={saving}>Save</button>
-            <button type="button" className="bg-gray-400 hover:bg-gray-500 text-white px-4 py-2 rounded" onClick={onClose}>Cancel</button>
+            <button type="submit" className="bg-blue-600 hover:bg-blue-700 text-white px-4 py-2 rounded" disabled={saving}>Opslaan</button>
+            <button type="button" className="bg-gray-400 hover:bg-gray-500 text-white px-4 py-2 rounded" onClick={onClose}>Annuleren</button>
           </div>
         </form>
       </div>
