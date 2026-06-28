@@ -7,10 +7,11 @@ import Spinner from '@/components/ui/Spinner'
 interface QRCodeProps {
   photoId: string
   eventId: string
+  accessCode?: string
   large: boolean
 }
 
-export default function QRCode({ photoId, eventId, large = true }: QRCodeProps) {
+export default function QRCode({ photoId, eventId, accessCode = '', large = true }: QRCodeProps) {
   const [baseUrl, setBaseUrl] = useState<string | null>(null)
   const [loading, setLoading] = useState(true)
 
@@ -26,8 +27,7 @@ export default function QRCode({ photoId, eventId, large = true }: QRCodeProps) 
             // Production: API returned full URL
             setBaseUrl(url)
           } else if (url) {
-            // Development: API returned just IP, construct full URL
-            setBaseUrl(`http://${url}:3000`)
+            setBaseUrl(`http://${url}:${window.location.port || '3000'}`)
           } else {
             // Fallback to window.location.origin
             setBaseUrl(typeof window !== 'undefined' ? window.location.origin : '')
@@ -47,7 +47,9 @@ export default function QRCode({ photoId, eventId, large = true }: QRCodeProps) 
     fetchBaseUrl()
   }, [])
 
-  const actionUrl = baseUrl ? `${baseUrl}/action?event=${eventId}&photo=${photoId || ''}` : ''
+  const actionUrl = baseUrl && eventId && accessCode
+    ? `${baseUrl}/action?event=${encodeURIComponent(eventId)}&code=${encodeURIComponent(accessCode)}${photoId ? `&photo=${encodeURIComponent(photoId)}` : ''}`
+    : ''
 
   const handleClick = (e: React.MouseEvent) => {
     // Prevent event propagation to parent
@@ -66,13 +68,25 @@ export default function QRCode({ photoId, eventId, large = true }: QRCodeProps) 
   console.log(`[QRCode] actionUrl: ${actionUrl}`)
   
   return (
-    <div className="bg-white p-2 rounded-lg shadow-lg cursor-pointer hover:shadow-xl transition-shadow" onClick={handleClick}>
-      <QRCodeSVG 
-        value={actionUrl}
-        size={large ? 256: 128}
-        level="L"
-        marginSize={4}
-      />
+    <div className="flex flex-col items-center gap-2">
+      <div
+        className="bg-white p-2 rounded-lg shadow-lg cursor-pointer hover:shadow-xl transition-shadow"
+        onClick={handleClick}
+      >
+        <QRCodeSVG
+          value={actionUrl}
+          size={large ? 256 : 128}
+          level="L"
+          marginSize={4}
+        />
+      </div>
+      <p
+        className={`text-center font-medium text-white drop-shadow-md ${
+          large ? 'text-sm' : 'text-xs'
+        }`}
+      >
+        Klik/Scan om toe te voegen
+      </p>
     </div>
   )
 } 

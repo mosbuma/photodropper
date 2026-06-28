@@ -10,6 +10,7 @@ export type Playlist = {
   eventCommentStream: CommentStreamItem[]
   commentStyle: 'TICKER' | 'COMICBOOK'
   scrollSpeedPct: number
+  photoDurationMs: number
   enablePhotoComments: boolean
   enableEventComments: boolean
 }
@@ -44,7 +45,8 @@ export async function GET(req: NextRequest) {
     const photos = await prisma.photo.findMany({
       where: {
         eventId,
-        visible: true
+        visible: true,
+        flaggedNotOk: false,
       },
       orderBy: { index: 'asc' }
     })
@@ -65,6 +67,10 @@ export async function GET(req: NextRequest) {
       eventId: photo.eventId,
       index: photo.index,
       photoUrl: photo.photoUrl,
+      mediaType: (photo.mediaType === 'video' ? 'video' : 'image') as 'image' | 'video',
+      durationMs: photo.durationMs,
+      thumbnailUrl: photo.thumbnailUrl,
+      mimeType: photo.mimeType,
       uploaderName: photo.uploaderName,
       dateTaken: photo.dateTaken,
       coordinates: photo.coordinates,
@@ -120,6 +126,7 @@ export async function GET(req: NextRequest) {
     // Get the event to fetch commentStyle
     const commentStyle = event?.commentStyle || 'TICKER'
     const scrollSpeedPct = event?.scrollSpeedPct ?? 50
+    const photoDurationMs = event?.photoDurationMs ?? 5000
 
     const playlist = {
       hash: '',
@@ -127,6 +134,7 @@ export async function GET(req: NextRequest) {
       eventCommentStream: eventCommentStream,
       commentStyle,
       scrollSpeedPct,
+      photoDurationMs,
       enablePhotoComments,
       enableEventComments,
     }

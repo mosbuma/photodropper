@@ -1,12 +1,17 @@
 'use client'
 
 import { useState, useEffect, useRef } from 'react'
-import { useSearchParams } from 'next/navigation'
+import { useSearchParams, useRouter } from 'next/navigation'
 import { useAppSelector, useAppDispatch } from '@/lib/hooks'
 import { setActiveEvent, resetApp, setCurrentPhotoIndex } from '@/lib/slices/appSlice'
 import { playlistManager } from '@/lib/playlistManager'
+import { persistor } from '@/lib/store'
 import PasswordDialog from '@/components/PasswordDialog'
-import ImageDisplay from '@/components/display/ImageDisplay'
+import WelcomePopup, { HelpButton } from '@/components/action/WelcomePopup'
+import { shouldShowWelcome } from '@/lib/welcomeStorage'
+import { verifyAndGrantEventAccess } from '@/lib/eventAccessClient'
+import { getEventAccessCode, hasEventAccess } from '@/lib/eventAccessStorage'
+import MediaDisplay from '@/components/display/MediaDisplay'
 import QRCode from '@/components/display/QRCode'
 import MetadataDisplay from '@/components/display/MetadataDisplay'
 import Ticker from '@/components/display/Ticker'
@@ -15,7 +20,10 @@ import EventCommentBubble from '@/components/display/EventCommentBubble'
 
 export default function Home() {
   const dispatch = useAppDispatch()
+  const router = useRouter()
   const searchParams = useSearchParams()
+  const eventParam = searchParams.get('event')
+  const codeParam = searchParams.get('code')
   const { 
     activeEventId, 
     currentPhotoIndex, 
@@ -23,16 +31,92 @@ export default function Home() {
     currentPlaylistHash
   } = useAppSelector(state => state.app)
   const [showPasswordDialog, setShowPasswordDialog] = useState(false)
+  const [accessDialogEventId, setAccessDialogEventId] = useState<string | null>(null)
+  const [accessDialogCode, setAccessDialogCode] = useState<string | null>(null)
   const [isLoading, setIsLoading] = useState(false)
+  const [showWelcome, setShowWelcome] = useState(false)
+  const [welcomePersistDismiss, setWelcomePersistDismiss] = useState(true)
+  const [welcomeEvent, setWelcomeEvent] = useState<{
+    name: string
+    enablePhotoComments?: boolean
+    enableEventComments?: boolean
+  } | null>(null)
+  const [persistReady, setPersistReady] = useState(
+    () => persistor.getState().bootstrapped
+  )
 
-  // Handle URL parameters for event selection
   useEffect(() => {
-    const eventParam = searchParams.get('event')
-    if (eventParam && eventParam !== activeEventId) {
-      console.log(`[Home] Setting active event from URL parameter: ${eventParam}`)
-      dispatch(setActiveEvent(eventParam))
+    if (persistReady) return
+    const unsubscribe = persistor.subscribe(() => {
+      if (persistor.getState().bootstrapped) {
+        setPersistReady(true)
+      }
+    })
+    if (persistor.getState().bootstrapped) {
+      setPersistReady(true)
     }
-  }, [searchParams, activeEventId, dispatch])
+    return unsubscribe
+  }, [persistReady])
+
+  // Resolve active event via invite link or stored access
+  useEffect(() => {
+    if (!persistReady) return
+
+    let cancelled = false
+
+    async function resolveActiveEvent() {
+      if (eventParam && codeParam) {
+        const result = await verifyAndGrantEventAccess({ eventId: eventParam, code: codeParam })
+        if (cancelled) return
+        if (result.ok) {
+          dispatch(setActiveEvent(eventParam))
+          return
+        }
+        setAccessDialogEventId(eventParam)
+        setAccessDialogCode(codeParam)
+        setShowPasswordDialog(true)
+        return
+      }
+
+      if (eventParam) {
+        if (hasEventAccess(eventParam)) {
+          const storedCode = getEventAccessCode(eventParam)
+          if (eventParam !== activeEventId) {
+            dispatch(setActiveEvent(eventParam))
+          }
+          if (storedCode) {
+            router.replace(`/?event=${eventParam}&code=${encodeURIComponent(storedCode)}`, { scroll: false })
+          }
+          return
+        }
+        setAccessDialogEventId(eventParam)
+        setAccessDialogCode(null)
+        setShowPasswordDialog(true)
+        return
+      }
+
+      if (activeEventId && hasEventAccess(activeEventId)) {
+        const storedCode = getEventAccessCode(activeEventId)
+        if (storedCode) {
+          router.replace(`/?event=${activeEventId}&code=${encodeURIComponent(storedCode)}`, { scroll: false })
+        }
+        return
+      }
+
+      if (activeEventId && !hasEventAccess(activeEventId)) {
+        dispatch(setActiveEvent(null))
+      }
+
+      setAccessDialogEventId(null)
+      setAccessDialogCode(null)
+      setShowPasswordDialog(true)
+    }
+
+    resolveActiveEvent()
+    return () => {
+      cancelled = true
+    }
+  }, [persistReady, eventParam, codeParam, activeEventId, dispatch, router])
 
   // Reset app state when switching events
   const prevEventIdRef = useRef<string | null>(null)
@@ -46,24 +130,12 @@ export default function Home() {
 
   const hasPhotos = !!currentPlaylist?.photoStream?.length
 
-  // Show dialog automatically when no active event AND there are photos
+  // Start playlist polling when event is unlocked
   useEffect(() => {
-    if (!activeEventId && hasPhotos) {
-      setShowPasswordDialog(true)
-    } else {
-      setShowPasswordDialog(false)
-    }
-  }, [activeEventId, hasPhotos])
-
-  // Start playlist polling when event is set as active
-  useEffect(() => {
-    console.log(`[Home] useEffect activeEventId: ${activeEventId}`)
-    if (activeEventId) {
-      console.log(`[Home] Starting playlist polling for event ${activeEventId} with hash ${currentPlaylistHash}`) 
+    if (activeEventId && hasEventAccess(activeEventId)) {
       setIsLoading(true)
       playlistManager.startPolling(activeEventId, currentPlaylistHash)
     } else {
-      console.log(`[Home] Stopping playlist polling`)
       playlistManager.stopPolling()
     }
 
@@ -102,13 +174,11 @@ export default function Home() {
 
   // Check if active event still exists
   useEffect(() => {
-    console.log(`[Home] useEffect activeEventId: ${activeEventId}`)
-    if (!activeEventId) return
-    // Check if event exists
-    fetch(`/api/social_events?id=${activeEventId}`)
+    if (!activeEventId || !hasEventAccess(activeEventId)) return
+    fetch(`/api/social_events/${activeEventId}`)
       .then(res => res.ok ? res.json() : null)
       .then(data => {
-        if (!data || (Array.isArray(data) && data.length === 0)) {
+        if (!data) {
           dispatch(setActiveEvent(null))
         }
       })
@@ -117,17 +187,69 @@ export default function Home() {
       })
   }, [activeEventId, dispatch])
 
-  // Slideshow timer: auto-advance photo index
+  // Show welcome/help dialog on first visit (monthly) once an event is active and unlocked
+  useEffect(() => {
+    if (!activeEventId || !hasEventAccess(activeEventId)) {
+      setWelcomeEvent(null)
+      return
+    }
+
+    let cancelled = false
+
+    async function loadWelcomeEvent() {
+      try {
+        const response = await fetch(`/api/social_events/${activeEventId}`)
+        if (!response.ok || cancelled) return
+        const event = await response.json()
+        if (cancelled) return
+
+        setWelcomeEvent({
+          name: event.name,
+          enablePhotoComments: event.enablePhotoComments,
+          enableEventComments: event.enableEventComments,
+        })
+
+        if (shouldShowWelcome()) {
+          setWelcomePersistDismiss(true)
+          setShowWelcome(true)
+        }
+      } catch {
+        // ignore
+      }
+    }
+
+    loadWelcomeEvent()
+    return () => {
+      cancelled = true
+    }
+  }, [activeEventId])
+
+  const advanceSlide = () => {
+    if (!currentPlaylist?.photoStream?.length) return
+    const nextIndex = (currentPhotoIndex + 1) % currentPlaylist.photoStream.length
+    dispatch(setCurrentPhotoIndex(nextIndex))
+  }
+
+  const currentPhoto = currentPlaylist?.photoStream?.[currentPhotoIndex]
+  const isCurrentVideo = currentPhoto?.mediaType === 'video'
+
+  // Slideshow timer: auto-advance for images only
   useEffect(() => {
     if (!currentPlaylist?.photoStream || currentPlaylist.photoStream.length === 0) {
       return
     }
-    const interval = setInterval(() => {
-      const nextIndex = (currentPhotoIndex + 1) % currentPlaylist.photoStream.length
-      dispatch(setCurrentPhotoIndex(nextIndex))
-    }, 5000) // Default 5 seconds per photo
+    if (isCurrentVideo) {
+      return
+    }
+    const durationMs = currentPlaylist.photoDurationMs ?? 5000
+    const interval = setInterval(advanceSlide, durationMs)
     return () => clearInterval(interval)
-  }, [currentPhotoIndex, currentPlaylist, dispatch])
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [currentPhotoIndex, currentPlaylist, isCurrentVideo, dispatch])
+
+  const handleVideoEnded = () => {
+    advanceSlide()
+  }
 
   // Click handler to open admin dialog when event is active
   const handlePageClick = () => {
@@ -141,8 +263,17 @@ export default function Home() {
     setShowPasswordDialog(false)
   }
 
+  const handleEventSelected = (eventId: string, code: string) => {
+    setShowPasswordDialog(false)
+    router.replace(`/?event=${eventId}&code=${encodeURIComponent(code)}`, { scroll: false })
+  }
+
+  const slideshowAccessCode =
+    (activeEventId ? getEventAccessCode(activeEventId) : null) || codeParam || ''
+
+  const slideshowUnlocked = Boolean(activeEventId && hasEventAccess(activeEventId))
+
   // Get current photo and comments
-  const currentPhoto = currentPlaylist?.photoStream?.[currentPhotoIndex]
   const photoComments = currentPhoto?.comments || []
   const eventComments = currentPlaylist?.eventCommentStream || []
 
@@ -162,8 +293,18 @@ export default function Home() {
 
   return (
     <div className="min-h-screen bg-black relative overflow-hidden" onClick={handlePageClick}>
+      {showWelcome && welcomeEvent && (
+        <WelcomePopup
+          eventName={welcomeEvent.name}
+          enablePhotoComments={welcomeEvent.enablePhotoComments}
+          enableEventComments={welcomeEvent.enableEventComments}
+          persistDismiss={welcomePersistDismiss}
+          onClose={() => setShowWelcome(false)}
+        />
+      )}
+
       {/* Loading indicator */}
-      {isLoading && activeEventId && (
+      {isLoading && slideshowUnlocked && (
         <div className="absolute inset-0 bg-black bg-opacity-75 flex items-center justify-center z-50">
           <div className="text-white text-center">
             <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-white mx-auto mb-4"></div>
@@ -173,35 +314,53 @@ export default function Home() {
       )}
 
       {/* Main Photo Display or Placeholder */}
-      {currentPhoto?.photoUrl ? (
-        <ImageDisplay />
+      {slideshowUnlocked && currentPhoto?.photoUrl ? (
+        <MediaDisplay onVideoEnded={handleVideoEnded} />
       ) : (
         <div className="h-screen bg-black flex items-center justify-center">
           <div className="text-white text-center">
-            <h2 className="text-2xl font-bold mb-2">No Photos</h2>
-            <p className="text-gray-400">Upload some photos to get started!</p>
+            <h2 className="text-2xl font-bold mb-2">
+              {slideshowUnlocked ? 'No Photos or Videos' : 'Feesttoegang vereist'}
+            </h2>
+            <p className="text-gray-400">
+              {slideshowUnlocked
+                ? 'Upload media to get started!'
+                : 'Open je uitnodigingslink of log in met feestnaam en code.'}
+            </p>
           </div>
         </div>
       )}
 
+      {slideshowUnlocked && (
+      <>
       {/* QR Code - Top Left (always visible) */}
       <div className="absolute top-4 left-4 z-10">
         <QRCode 
           photoId={currentPhoto?.photoId || ''}
           eventId={activeEventId || ''}
+          accessCode={slideshowAccessCode}
           large={true}
         />
       </div>
 
-      {/* Metadata - Top Right (only if photo) */}
-      {currentPlaylist?.commentStyle === 'TICKER' && (
-        <div className="absolute top-4 right-4 z-10">
+      {/* Help + metadata - Top Right */}
+      <div className="absolute top-4 right-4 z-20 flex flex-col items-end gap-2">
+        {activeEventId && welcomeEvent && (
+          <HelpButton
+            onClick={() => {
+              setWelcomePersistDismiss(false)
+              setShowWelcome(true)
+            }}
+            className="bg-black/60 hover:bg-black/80 text-white border border-white/30"
+          />
+        )}
+        {currentPlaylist?.commentStyle === 'TICKER' && (
           <MetadataDisplay 
             dateTaken={currentPhoto?.dateTaken || null}
             location={currentPhoto?.location || null}
           />
-        </div>
-      )}
+        )}
+      </div>
 
       {/* Ticker or ComicBook Comments - Bottom */}
       {currentPlaylist?.commentStyle === 'TICKER' ? (
@@ -252,8 +411,17 @@ export default function Home() {
           </div>
         </>
       )}
+      </>
+      )}
 
-      { showPasswordDialog && <PasswordDialog onClose={handleClosePasswordDialog} /> }
+      { showPasswordDialog && (
+        <PasswordDialog
+          onClose={handleClosePasswordDialog}
+          onEventSelected={handleEventSelected}
+          initialEventId={accessDialogEventId}
+          initialCode={accessDialogCode}
+        />
+      ) }
     </div>
   )
 }

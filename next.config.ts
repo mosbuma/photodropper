@@ -4,7 +4,7 @@ const nextConfig: NextConfig = {
   ...(process.env.NODE_ENV === 'production' && { output: 'standalone' }),
   allowedDevOrigins: ['192.168.178.*'],
   experimental: {
-    proxyClientMaxBodySize: '25mb',
+    proxyClientMaxBodySize: '550mb',
   },
 };
 

@@ -5,6 +5,7 @@ Party photo wall for TV slideshow, QR guest upload, and ticker comments. Self-ho
 ## Features
 
 - Slideshow with QR upload link per photo
+- Photo and video upload (MP4, MOV, WebM up to 500 MB)
 - Two-row comment ticker (photo + event)
 - Mobile guest upload and comments (`/action`)
 - Admin management panel (`/management`)

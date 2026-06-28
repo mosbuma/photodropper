@@ -3,6 +3,10 @@ export interface Photo {
   eventId: string;
   index: number;
   photoUrl: string;
+  mediaType?: 'image' | 'video';
+  durationMs?: number | null;
+  thumbnailUrl?: string | null;
+  mimeType?: string | null;
   uploaderName?: string;
   dateTaken?: string;
   coordinates?: string;

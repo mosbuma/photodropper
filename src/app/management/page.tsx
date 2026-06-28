@@ -10,6 +10,9 @@ import type { SocialEvent } from '@/types/socialEvent'
 import type { CommentStreamItem, PhotoStreamItem } from '@/lib/slices/appSlice'
 import BulkUploadPopup from '@/components/action/BulkUploadPopup'
 import QRCode from '@/components/display/QRCode'
+import MediaThumbnail from '@/components/display/MediaThumbnail'
+import { grantEventAccess } from '@/lib/eventAccessStorage'
+import { buildActionPath, buildJoinPath } from '@/lib/eventAccess'
 
 export default function ManagementPage() {
   const router = useRouter()
@@ -48,6 +51,8 @@ export default function ManagementPage() {
   // State for edit event
   const [editEventEnablePhotoComments, setEditEventEnablePhotoComments] = useState(true);
   const [editEventEnableEventComments, setEditEventEnableEventComments] = useState(false);
+  const [editEventAccessCode, setEditEventAccessCode] = useState('');
+  const [regeneratingAccessCode, setRegeneratingAccessCode] = useState(false);
 
   // Pagination hooks (must be before any early return)
   const PHOTOS_PER_PAGE = 12;
@@ -103,8 +108,9 @@ export default function ManagementPage() {
         const newEvent = await response.json()
         setEvents(prev => [...prev, newEvent])
         dispatch(setActiveEvent(newEvent.id))
+        grantEventAccess(newEvent.id, newEvent.accessCode)
         setShowNewEventModal(false)
-        alert('Event created successfully!')
+        alert(`Event created.\n\nJoin link:\n${window.location.origin}${buildJoinPath(newEvent.slug, newEvent.accessCode)}\n\nAccess code: ${newEvent.accessCode}`)
       } else {
         const error = await response.json()
         setNewEventError(error.error || 'Failed to create event')
@@ -117,8 +123,12 @@ export default function ManagementPage() {
   }
 
   const handleSetActiveEvent = (eventId: string) => {
+    const event = events.find(e => e.id === eventId)
+    if (event) {
+      grantEventAccess(eventId, event.accessCode)
+    }
     dispatch(setActiveEvent(eventId))
-    alert(`Event ${eventId} set as active`)
+    alert(`Event "${event?.name || eventId}" set as active`)
   }
 
   const handleBulkUpload = () => {
@@ -225,6 +235,48 @@ export default function ManagementPage() {
     }
   }
 
+  const approvePhoto = async (photo: PhotoStreamItem) => {
+    try {
+      const response = await fetch('/api/photos', {
+        method: 'PUT',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          id: photo.id,
+          flaggedNotOk: false,
+          visible: true,
+        }),
+      })
+      if (!response.ok) throw new Error('Failed to approve photo')
+      const updated = await response.json()
+      setPhotos(prev => prev.map(p => (p.id === photo.id ? { ...p, ...updated } : p)))
+    } catch (error) {
+      console.error('Error approving photo:', error)
+      alert('Kon foto niet goedkeuren')
+    }
+  }
+
+  const flagPhotoNotOk = async (photo: PhotoStreamItem) => {
+    if (!window.confirm('Markeren als niet oké en verbergen van het scherm?')) return
+
+    try {
+      const response = await fetch('/api/photos', {
+        method: 'PUT',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          id: photo.id,
+          flaggedNotOk: true,
+          visible: false,
+        }),
+      })
+      if (!response.ok) throw new Error('Failed to flag photo')
+      const updated = await response.json()
+      setPhotos(prev => prev.map(p => (p.id === photo.id ? { ...p, ...updated } : p)))
+    } catch (error) {
+      console.error('Error flagging photo:', error)
+      alert('Kon foto niet markeren')
+    }
+  }
+
   const loadComments = async () => {
     if (!activeEventId) return
     
@@ -294,8 +346,8 @@ export default function ManagementPage() {
 
     const checkActiveEvent = async () => {
       try {
-        const response = await fetch(`/api/social_events?id=${activeEventId}`)
-        if (!response.ok || (await response.json()).length === 0) {
+        const response = await fetch(`/api/social_events/${activeEventId}`)
+        if (!response.ok) {
           console.log(`Active event ${activeEventId} no longer exists (polling), clearing it`)
           dispatch(setActiveEvent(null))
         }
@@ -332,6 +384,7 @@ export default function ManagementPage() {
     setEditEventError(null)
     setEditEventEnablePhotoComments(event.enablePhotoComments ?? true)
     setEditEventEnableEventComments(event.enableEventComments ?? false)
+    setEditEventAccessCode(event.accessCode || '')
   }
 
   const handleSaveEditEvent = async () => {
@@ -349,7 +402,8 @@ export default function ManagementPage() {
           scrollSpeedPct: editEventScrollSpeed,
           commentStyle: editEventCommentStyle,
           enablePhotoComments: editEventEnablePhotoComments,
-          enableEventComments: editEventEnableEventComments
+          enableEventComments: editEventEnableEventComments,
+          accessCode: editEventAccessCode,
         })
       })
       if (response.ok) {
@@ -370,7 +424,61 @@ export default function ManagementPage() {
   // Validation for event fields
   const isPhotoDurationValid = editEventPhotoDuration >= 0
   const isScrollSpeedValid = editEventScrollSpeed >= 0 && editEventScrollSpeed <= 100
-  const isEditEventValid = editEventName.trim() && isPhotoDurationValid && isScrollSpeedValid
+  const isEditEventValid = editEventName.trim() && isPhotoDurationValid && isScrollSpeedValid && editEventAccessCode.trim().length >= 4
+
+  const activeEvent = events.find(event => event.id === activeEventId)
+
+  const openGuestActionPage = (event: SocialEvent) => {
+    if (!event.accessCode) {
+      alert('Join link unavailable: run database/migrations/20260628_add_event_access.sql on MariaDB, then refresh this page.')
+      return
+    }
+    window.location.href = buildActionPath(event.id, event.accessCode)
+  }
+
+  const copyJoinLink = async (event: SocialEvent) => {
+    if (!event.slug || !event.accessCode) {
+      alert('Join link unavailable: run database/migrations/20260628_add_event_access.sql on MariaDB, then refresh this page.')
+      return
+    }
+    const url = `${window.location.origin}${buildJoinPath(event.slug, event.accessCode)}`
+    try {
+      await navigator.clipboard.writeText(url)
+      alert('Join link copied to clipboard')
+    } catch {
+      prompt('Copy this join link:', url)
+    }
+  }
+
+  const handleRegenerateAccessCode = async () => {
+    if (!editEvent) return
+    if (!confirm('Generate a new access code? Old invite links will stop working.')) return
+    setRegeneratingAccessCode(true)
+    setEditEventError(null)
+    try {
+      const response = await fetch(`/api/social_events?id=${editEvent.id}`, {
+        method: 'PUT',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          id: editEvent.id,
+          regenerateAccessCode: true,
+        }),
+      })
+      if (!response.ok) {
+        const error = await response.json()
+        setEditEventError(error.error || 'Failed to regenerate access code')
+        return
+      }
+      const updated = await response.json()
+      setEvents(events => events.map(e => e.id === updated.id ? updated : e))
+      setEditEventAccessCode(updated.accessCode)
+      alert(`New access code: ${updated.accessCode}`)
+    } catch {
+      setEditEventError('Failed to regenerate access code')
+    } finally {
+      setRegeneratingAccessCode(false)
+    }
+  }
 
   // Show loading while checking authentication
   if (status === 'loading') {
@@ -504,6 +612,28 @@ export default function ManagementPage() {
                     <p className="text-sm text-gray-400">
                       Created: {new Date(event.createdAt).toLocaleDateString()}
                     </p>
+                    <p className="text-xs text-gray-500 mt-2 break-all">
+                      Link: {event.slug && event.accessCode
+                        ? buildJoinPath(event.slug, event.accessCode)
+                        : 'Migration required — slug/code missing'}
+                    </p>
+                    <p className="text-xs text-gray-500">
+                      Code: {event.accessCode || '—'}
+                    </p>
+                    <div className="mt-2 flex flex-wrap gap-3">
+                      <button
+                        onClick={() => copyJoinLink(event)}
+                        className="text-xs text-blue-400 hover:text-blue-300"
+                      >
+                        Copy join link
+                      </button>
+                      <button
+                        onClick={() => openGuestActionPage(event)}
+                        className="text-xs text-green-400 hover:text-green-300"
+                      >
+                        Kijken
+                      </button>
+                    </div>
                     {activeEventId === event.id && (
                       <span className="inline-block bg-green-600 text-white text-xs px-2 py-1 rounded mt-2">
                         Active
@@ -563,11 +693,22 @@ export default function ManagementPage() {
                       
                       return (
                         <div key={photo.id} className="bg-gray-800 rounded-lg overflow-hidden relative group">
-                          {/* eslint-disable-next-line @next/next/no-img-element */}
-                          <img 
-                            src={photo.photoUrl} 
-                            alt="Photo"
-                            className="w-full h-48 object-cover"
+                          {photo.flaggedNotOk && (
+                            <div className="absolute top-2 left-2 z-10 flex items-center gap-1 bg-amber-500 text-black text-xs font-bold px-2 py-1 rounded shadow">
+                              <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                <circle cx="12" cy="12" r="9" strokeWidth={2} />
+                                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 10h.01M15 10h.01" />
+                                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 15c.83.67 1.83 1 3 1s2.17-.33 3-1" />
+                              </svg>
+                              Niet oké
+                            </div>
+                          )}
+                          <MediaThumbnail
+                            photoUrl={photo.photoUrl}
+                            thumbnailUrl={photo.thumbnailUrl}
+                            mediaType={photo.mediaType === 'video' ? 'video' : 'image'}
+                            alt="Media"
+                            className={`w-full h-48 object-cover${photo.flaggedNotOk ? ' opacity-60' : ''}`}
                           />
                           <div className="flex flex-row flex-wrap gap-2 justify-center items-center mt-1 mb-1 w-full">
                             {photo.uploaderName && (
@@ -587,6 +728,25 @@ export default function ManagementPage() {
                             )}
                             {/* Always show action buttons */}
                             <div className="flex gap-2 items-center ml-auto">
+                              {photo.flaggedNotOk ? (
+                                <button
+                                  type="button"
+                                  onClick={() => approvePhoto(photo)}
+                                  className="bg-green-500 hover:bg-green-600 text-white text-xs font-semibold px-2 py-1 rounded shadow"
+                                  title="Weer tonen op het scherm"
+                                >
+                                  Goedkeuren
+                                </button>
+                              ) : (
+                                <button
+                                  type="button"
+                                  onClick={() => flagPhotoNotOk(photo)}
+                                  className="bg-red-950 hover:bg-red-900 text-white text-xs font-semibold px-2 py-1 rounded shadow"
+                                  title="Verbergen van het live scherm"
+                                >
+                                  Niet oké
+                                </button>
+                              )}
                               <button onClick={() => setEditPhoto(photo)} className="bg-white rounded-full p-1 shadow hover:bg-blue-100">
                                 {/* Edit icon (pencil) */}
                                 <svg width="20" height="20" fill="none" viewBox="0 0 24 24" stroke="currentColor" className="text-blue-600"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15.232 5.232l3.536 3.536M9 13l6.586-6.586a2 2 0 112.828 2.828L11.828 15.828a2 2 0 01-1.414.586H7v-3a2 2 0 01.586-1.414z" /></svg>
@@ -781,8 +941,13 @@ export default function ManagementPage() {
                       return (
                         <tr key={photo.photoId} className="border-b border-gray-700">
                           <td className="px-4 py-2">
-                            {/* eslint-disable-next-line @next/next/no-img-element */}
-                            <img src={photo.photoUrl} alt="Photo" className="w-24 h-16 object-cover rounded" />
+                            <MediaThumbnail
+                              photoUrl={photo.photoUrl}
+                              thumbnailUrl={photo.thumbnailUrl}
+                              mediaType={photo.mediaType || 'image'}
+                              alt="Media"
+                              className="w-24 h-16 object-cover rounded"
+                            />
                           </td>
                           <td className="px-4 py-2">{photo.uploaderName || 'Anonymous'}</td>
                           <td className="px-4 py-2 whitespace-pre-line text-xs text-gray-300">
@@ -942,6 +1107,30 @@ export default function ManagementPage() {
               step={1}
               onChange={e => setEditEventScrollSpeed(Number(e.target.value))}
             />
+            {!isScrollSpeedValid && <div className="text-red-500 text-xs mb-2">Scroll speed must be between 0 and 100.</div>}
+            <label className="block text-sm font-medium mb-2">Access Code</label>
+            <div className="flex gap-2 mb-4">
+              <input
+                type="text"
+                className="flex-1 px-3 py-2 bg-white border border-gray-400 rounded text-gray-900 focus:outline-none focus:border-blue-500 uppercase tracking-widest"
+                value={editEventAccessCode}
+                onChange={e => setEditEventAccessCode(e.target.value.toUpperCase())}
+                maxLength={32}
+              />
+              <button
+                type="button"
+                className="bg-gray-700 hover:bg-gray-600 text-white px-3 py-2 rounded text-sm"
+                onClick={handleRegenerateAccessCode}
+                disabled={regeneratingAccessCode}
+              >
+                {regeneratingAccessCode ? '...' : 'New code'}
+              </button>
+            </div>
+            {editEvent && (
+              <p className="text-xs text-gray-500 mb-4 break-all">
+                Join link: {buildJoinPath(editEvent.slug, editEventAccessCode || editEvent.accessCode)}
+              </p>
+            )}
             <label className="block text-sm font-medium mb-2">Comment Style</label>
             <select
               className="w-full px-3 py-2 bg-white border border-gray-400 rounded text-gray-900 focus:outline-none focus:border-blue-500 mb-4"
@@ -951,7 +1140,6 @@ export default function ManagementPage() {
               <option value="TICKER">Ticker (classic)</option>
               <option value="COMICBOOK">Comic Book Bubbles</option>
             </select>
-            {!isScrollSpeedValid && <div className="text-red-500 text-xs mb-2">Scroll speed must be between 0 and 100.</div>}
             {editEventError && <div className="text-red-500 text-sm mb-4">{editEventError}</div>}
             <label className="block text-sm font-medium mb-2">
               <input type="checkbox" className="mr-2" checked={editEventEnablePhotoComments} onChange={e => setEditEventEnablePhotoComments(e.target.checked)} />
@@ -994,11 +1182,12 @@ export default function ManagementPage() {
       )}
 
       {/* QR Code - Lower Right Corner */}
-      {activeEventId && (
+      {activeEventId && activeEvent && (
         <div className="fixed bottom-4 right-4 z-40">
           <QRCode 
             photoId=""
             eventId={activeEventId}
+            accessCode={activeEvent.accessCode}
             large={false}
           />
         </div>
@@ -1064,8 +1253,9 @@ function PhotoEditPopup({ photo, onClose, onSave }: { photo: PhotoStreamItem, on
     uploaderName: photo.uploaderName || '',
     location: photo.location || '',
     dateTaken: photo.dateTaken || '',
-    visible: photo.visible,
-  })
+      visible: photo.visible,
+      flaggedNotOk: photo.flaggedNotOk ?? false,
+    })
   const [saving, setSaving] = useState(false)
   const [error, setError] = useState<string | null>(null)
 
@@ -1085,10 +1275,11 @@ function PhotoEditPopup({ photo, onClose, onSave }: { photo: PhotoStreamItem, on
           location: meta.location,
           dateTaken: meta.dateTaken ? meta.dateTaken : null,
           visible: meta.visible,
+          flaggedNotOk: meta.flaggedNotOk,
         })
       })
       if (!res.ok) throw new Error('Failed to update photo')
-      onSave({ ...photo, ...meta })
+      onSave({ ...photo, ...meta, flaggedNotOk: meta.flaggedNotOk })
       onClose()
     } catch (err) {
       setError(err instanceof Error ? err.message : 'Failed to update photo')

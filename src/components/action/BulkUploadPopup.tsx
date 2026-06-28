@@ -3,7 +3,14 @@
 import { useState } from 'react'
 import Spinner from '@/components/ui/Spinner'
 import { extractExifData, getLocationFromExif } from '@/lib/photoMeta'
-import { getFileSizeError, getResponseErrorMessage } from '@/lib/fetchUtils'
+import {
+  getMediaKind,
+  getUploadValidationError,
+  formatFileDate,
+  getVideoDurationMs,
+  captureVideoThumbnail,
+} from '@/lib/mediaUtils'
+import { getResponseErrorMessage } from '@/lib/fetchUtils'
 
 interface BulkUploadPopupProps {
   eventId: string
@@ -19,8 +26,9 @@ interface UploadProgress {
 }
 
 export default function BulkUploadPopup({ eventId, onClose, onUploadComplete }: BulkUploadPopupProps) {
-  const [fileList, setFileList] = useState('')
-  const [uploaderName, setUploaderName] = useState(typeof window !== 'undefined' ? localStorage.getItem('photodropper_name') || '' : '')
+  const [uploaderName, setUploaderName] = useState(
+    typeof window !== 'undefined' ? localStorage.getItem('photodropper_name') || '' : ''
+  )
   const [isUploading, setIsUploading] = useState(false)
   const [progress, setProgress] = useState<UploadProgress | null>(null)
   const [error, setError] = useState<string | null>(null)
@@ -29,93 +37,95 @@ export default function BulkUploadPopup({ eventId, onClose, onUploadComplete }: 
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault()
-    
-    const hasDroppedFiles = droppedFiles.length > 0
-    if (!hasDroppedFiles) {
-      setError('Please drop image files to upload')
+
+    if (droppedFiles.length === 0) {
+      setError('Please drop photo or video files to upload')
       return
     }
 
     setIsUploading(true)
     setError(null)
 
-    // Save name to localStorage
     if (uploaderName) {
       localStorage.setItem('photodropper_name', uploaderName)
     }
 
     let completed = 0
     let failed = 0
-    let totalFiles = 0
+    const totalFiles = droppedFiles.length
 
-    // Handle dropped files first
-    if (hasDroppedFiles) {
-      totalFiles += droppedFiles.length
-      setProgress({
-        total: totalFiles,
-        completed: 0,
-        failed: 0,
-        currentFile: ''
-      })
+    setProgress({ total: totalFiles, completed: 0, failed: 0, currentFile: '' })
 
-      for (let i = 0; i < droppedFiles.length; i++) {
-        const file = droppedFiles[i]
-        setProgress(prev => prev ? { ...prev, currentFile: file.name } : null)
+    for (let i = 0; i < droppedFiles.length; i++) {
+      const file = droppedFiles[i]
+      setProgress(prev => (prev ? { ...prev, currentFile: file.name } : null))
 
-        const fileError = getFileSizeError(file)
-        if (fileError) {
-          console.error(`Skipping ${file.name}:`, fileError)
-          failed++
-          setProgress(prev => prev ? { ...prev, completed, failed } : null)
-          continue
-        }
+      const fileError = getUploadValidationError(file)
+      if (fileError) {
+        console.error(`Skipping ${file.name}:`, fileError)
+        failed++
+        setProgress(prev => (prev ? { ...prev, completed, failed } : null))
+        continue
+      }
 
-        try {
-          // Extract EXIF metadata and location
-          let dateTaken = ''
-          let location = ''
+      try {
+        const kind = getMediaKind(file) || 'image'
+        let dateTaken = ''
+        let location = ''
+        let durationMs: number | null = null
+        let thumbnailBlob: Blob | null = null
+
+        if (kind === 'image') {
           try {
             const exifData = await extractExifData(file)
             location = (await getLocationFromExif(exifData)) || ''
-            dateTaken = exifData.DateTimeOriginal?.description || exifData.createdAt?.description || '';
+            dateTaken = exifData.DateTimeOriginal?.description || exifData.createdAt?.description || ''
           } catch (metaErr) {
             console.warn('Could not extract EXIF/location:', metaErr)
           }
-
-          // Upload using FormData
-          const formData = new FormData()
-          formData.append('file', file)
-          formData.append('eventId', eventId)
-          formData.append('uploaderName', uploaderName)
-          formData.append('comment', '')
-          formData.append('location', location)
-          formData.append('dateTaken', dateTaken)
-
-          const uploadResponse = await fetch('/api/photos/upload', {
-            method: 'POST',
-            body: formData
-          })
-
-          if (uploadResponse.ok) {
-            completed++
-          } else {
-            console.error(`Upload failed for ${file.name}:`, await getResponseErrorMessage(uploadResponse))
-            failed++
-          }
-        } catch (err) {
-          console.error(`Error processing ${file.name}:`, err)
-          failed++
+        } else {
+          dateTaken = formatFileDate(file)
+          durationMs = await getVideoDurationMs(file)
+          thumbnailBlob = await captureVideoThumbnail(file)
         }
 
-        setProgress(prev => prev ? { ...prev, completed, failed } : null)
+        const formData = new FormData()
+        formData.append('file', file)
+        formData.append('eventId', eventId)
+        formData.append('uploaderName', uploaderName)
+        formData.append('comment', '')
+        formData.append('location', location)
+        formData.append('dateTaken', dateTaken)
+        if (durationMs != null) {
+          formData.append('durationMs', String(durationMs))
+        }
+        if (thumbnailBlob) {
+          formData.append('thumbnail', thumbnailBlob, 'thumbnail.jpg')
+        }
+
+        const uploadResponse = await fetch('/api/photos/upload', {
+          method: 'POST',
+          body: formData,
+        })
+
+        if (uploadResponse.ok) {
+          completed++
+        } else {
+          console.error(`Upload failed for ${file.name}:`, await getResponseErrorMessage(uploadResponse))
+          failed++
+        }
+      } catch (err) {
+        console.error(`Error processing ${file.name}:`, err)
+        failed++
       }
+
+      setProgress(prev => (prev ? { ...prev, completed, failed } : null))
     }
 
     setIsUploading(false)
-    
-    // Show completion message
+
     if (completed > 0) {
-      alert(`Upload completed! Successfully uploaded ${completed} photos${failed > 0 ? `, ${failed} failed` : ''}.`)
+      alert(`Upload completed! Successfully uploaded ${completed} file(s)${failed > 0 ? `, ${failed} failed` : ''}.`)
       onUploadComplete()
       onClose()
     } else {
@@ -123,60 +133,38 @@ export default function BulkUploadPopup({ eventId, onClose, onUploadComplete }: 
     }
   }
 
-  const handleCancel = () => {
-    if (!isUploading) {
-      onClose()
-    }
-  }
-
-  // Drag and drop handlers
-  const handleDragOver = (e: React.DragEvent) => {
-    e.preventDefault()
-    e.stopPropagation()
-    setIsDragOver(true)
-  }
-
-  const handleDragLeave = (e: React.DragEvent) => {
-    e.preventDefault()
-    e.stopPropagation()
-    setIsDragOver(false)
-  }
-
   const handleDrop = (e: React.DragEvent) => {
     e.preventDefault()
     e.stopPropagation()
     setIsDragOver(false)
 
-    const files = Array.from(e.dataTransfer.files)
-    const imageFiles = files.filter(file => file.type.startsWith('image/'))
-    
-    if (imageFiles.length === 0) {
-      setError('Please drop image files only')
+    const files = Array.from(e.dataTransfer.files).filter(f => getMediaKind(f) !== null)
+
+    if (files.length === 0) {
+      setError('Please drop photo or video files only')
       return
     }
 
-    setDroppedFiles(imageFiles)
+    setDroppedFiles(files)
     setError(null)
   }
 
   return (
     <div className="fixed inset-0 bg-black bg-opacity-70 flex items-center justify-center z-50">
       <div className="bg-white text-black rounded-lg p-6 w-full max-w-md relative">
-        <button 
-          className="absolute top-2 right-2 text-gray-500" 
-          onClick={handleCancel}
+        <button
+          className="absolute top-2 right-2 text-gray-500"
+          onClick={onClose}
           disabled={isUploading}
         >
           &times;
         </button>
-        
-        <h2 className="text-xl font-bold mb-4">Bulk Upload Photos</h2>
-        
+
+        <h2 className="text-xl font-bold mb-4">Bulk Upload Photos & Videos</h2>
+
         <form onSubmit={handleSubmit}>
           <div className="mb-4">
-            <label className="block text-sm font-medium mb-2">
-              Uploader Name
-            </label>
+            <label className="block text-sm font-medium mb-2">Uploader Name</label>
             <input
               type="text"
               placeholder="Anonymous"
@@ -188,19 +176,14 @@ export default function BulkUploadPopup({ eventId, onClose, onUploadComplete }: 
             />
           </div>
 
-          {/* Drag and Drop Area */}
           <div className="mb-4">
-            <label className="block text-sm font-medium mb-2">
-              Drop Image Files Here
-            </label>
+            <label className="block text-sm font-medium mb-2">Drop Files Here</label>
             <div
-              onDragOver={handleDragOver}
-              onDragLeave={handleDragLeave}
+              onDragOver={e => { e.preventDefault(); setIsDragOver(true) }}
+              onDragLeave={e => { e.preventDefault(); setIsDragOver(false) }}
               onDrop={handleDrop}
               className={`border-2 border-dashed rounded-lg p-6 text-center transition-colors ${
-                isDragOver 
-                  ? 'border-blue-500 bg-blue-50' 
-                  : 'border-gray-300 hover:border-gray-400'
+                isDragOver ? 'border-blue-500 bg-blue-50' : 'border-gray-300 hover:border-gray-400'
               }`}
             >
               {droppedFiles.length > 0 ? (
@@ -210,9 +193,7 @@ export default function BulkUploadPopup({ eventId, onClose, onUploadComplete }: 
                   </p>
                   <div className="text-xs text-gray-500 space-y-1 max-h-20 overflow-y-auto">
                     {droppedFiles.map((file, index) => (
-                      <div key={index} className="truncate">
-                        {file.name}
-                      </div>
+                      <div key={index} className="truncate">{file.name}</div>
                     ))}
                   </div>
                   <button
@@ -226,12 +207,8 @@ export default function BulkUploadPopup({ eventId, onClose, onUploadComplete }: 
                 </div>
               ) : (
                 <div>
-                  <p className="text-gray-500 mb-2">
-                    Drag and drop image files here
-                  </p>
-                  <p className="text-xs text-gray-400">
-                    Supports JPG, PNG, GIF, WebP, etc.
-                  </p>
+                  <p className="text-gray-500 mb-2">Drag and drop photos or videos here</p>
+                  <p className="text-xs text-gray-400">JPG, PNG, HEIC, MP4, MOV, WebM, etc.</p>
                 </div>
               )}
             </div>
@@ -244,28 +221,24 @@ export default function BulkUploadPopup({ eventId, onClose, onUploadComplete }: 
                 <span>Failed: {progress.failed}</span>
               </div>
               <div className="w-full bg-gray-200 rounded-full h-2">
-                <div 
+                <div
                   className="bg-blue-600 h-2 rounded-full transition-all duration-300"
                   style={{ width: `${((progress.completed + progress.failed) / progress.total) * 100}%` }}
-                ></div>
+                />
               </div>
               {progress.currentFile && (
-                <p className="text-xs text-gray-600 mt-1 truncate">
-                  Current: {progress.currentFile}
-                </p>
+                <p className="text-xs text-gray-600 mt-1 truncate">Current: {progress.currentFile}</p>
               )}
             </div>
           )}
 
-          {error && (
-            <div className="text-red-600 mb-4 text-sm">{error}</div>
-          )}
+          {error && <div className="text-red-600 mb-4 text-sm">{error}</div>}
 
           <div className="flex gap-2 justify-center">
             <button
               type="submit"
               className="bg-green-600 hover:bg-green-700 text-white px-4 py-2 rounded disabled:bg-gray-400"
-              disabled={isUploading || (!fileList.trim() && droppedFiles.length === 0)}
+              disabled={isUploading || droppedFiles.length === 0}
             >
               {isUploading ? (
                 <div className="flex items-center gap-2">
@@ -273,13 +246,13 @@ export default function BulkUploadPopup({ eventId, onClose, onUploadComplete }: 
                   Uploading...
                 </div>
               ) : (
-                'Upload Photos'
+                'Upload'
               )}
             </button>
             <button
               type="button"
               className="bg-gray-400 hover:bg-gray-500 text-white px-4 py-2 rounded"
-              onClick={handleCancel}
+              onClick={onClose}
               disabled={isUploading}
             >
               Cancel
@@ -289,4 +262,4 @@ export default function BulkUploadPopup({ eventId, onClose, onUploadComplete }: 
       </div>
     </div>
   )
-} 
+}

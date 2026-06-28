@@ -3,50 +3,61 @@
 import { useState, useEffect } from 'react'
 import Spinner from '@/components/ui/Spinner'
 import { useAppSelector } from '@/lib/hooks'
+import MediaThumbnail from '@/components/display/MediaThumbnail'
 
 interface CommentPopupProps {
   eventId: string
   photoId?: string
   type: 'photo' | 'event'
+  accessCode: string
   onClose: () => void
 }
 
-export default function CommentPopup({ eventId, photoId, type, onClose }: CommentPopupProps) {
+export default function CommentPopup({ eventId, photoId, type, accessCode, onClose }: CommentPopupProps) {
   const [name, setName] = useState(
     typeof window !== 'undefined' ? localStorage.getItem('photodropper_name') || '' : ''
   )
   const [comment, setComment] = useState('')
   const [isSubmitting, setIsSubmitting] = useState(false)
   const [error, setError] = useState<string | null>(null)
-  const [photoUrl, setPhotoUrl] = useState<string | null>(null)
+  const [previewMedia, setPreviewMedia] = useState<{
+    photoUrl: string
+    thumbnailUrl?: string | null
+    mediaType?: 'image' | 'video'
+  } | null>(null)
 
   const { currentPlaylist } = useAppSelector(state => state.app)
 
-  // Find the photoUrl for the given photoId (if type is 'photo')
   useEffect(() => {
     if (type === 'photo' && photoId) {
-      // First try to get from currentPlaylist (main app)
       if (currentPlaylist) {
         const photo = currentPlaylist.photoStream.find(p => p.photoId === photoId)
         if (photo?.photoUrl) {
-          setPhotoUrl(photo.photoUrl)
+          setPreviewMedia({
+            photoUrl: photo.photoUrl,
+            thumbnailUrl: photo.thumbnailUrl,
+            mediaType: photo.mediaType,
+          })
           return
         }
       }
-      
-      // If not found in playlist, fetch directly from API (action page)
+
       const fetchPhoto = async () => {
         try {
           const response = await fetch(`/api/photos?id=${photoId}`)
           if (response.ok) {
             const photoData = await response.json()
-            setPhotoUrl(photoData.photoUrl)
+            setPreviewMedia({
+              photoUrl: photoData.photoUrl,
+              thumbnailUrl: photoData.thumbnailUrl,
+              mediaType: photoData.mediaType === 'video' ? 'video' : 'image',
+            })
           }
         } catch (err) {
           console.error('Error fetching photo:', err)
         }
       }
-      
+
       fetchPhoto()
     }
   }, [type, photoId, currentPlaylist])
@@ -54,7 +65,7 @@ export default function CommentPopup({ eventId, photoId, type, onClose }: Commen
   console.log(`[CommentPopup] type: ${type}`)
   console.log(`[CommentPopup] photoId: ${photoId}`)
   console.log(`[CommentPopup] currentPlaylist: ${JSON.stringify(currentPlaylist)}`)
-  console.log(`[CommentPopup] photoUrl: ${photoUrl}`)
+  console.log(`[CommentPopup] previewMedia:`, previewMedia)
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault()
@@ -72,6 +83,7 @@ export default function CommentPopup({ eventId, photoId, type, onClose }: Commen
       // Prepare comment data
       const commentData = {
         eventId: eventId,
+        accessCode,
         photoId: type === 'photo' && photoId ? photoId : null,
         index: 0, // Will be set by backend
         comment: comment.trim(),
@@ -113,14 +125,15 @@ export default function CommentPopup({ eventId, photoId, type, onClose }: Commen
 
         <form onSubmit={handleSubmit}>
           {/* Photo preview for photo comments */}
-          {type === 'photo' && photoUrl && (
+          {type === 'photo' && previewMedia && (
             <div className="flex justify-center mb-3">
-              {/* eslint-disable-next-line @next/next/no-img-element */}
-              <img
-                src={photoUrl}
-                alt="Photo preview"
+              <MediaThumbnail
+                photoUrl={previewMedia.photoUrl}
+                thumbnailUrl={previewMedia.thumbnailUrl}
+                mediaType={previewMedia.mediaType}
+                alt="Media preview"
                 className="w-auto h-48 object-cover rounded shadow border"
-                style={{ background: '#eee' }}
+                videoControls
               />
             </div>
           )}

@@ -118,6 +118,16 @@ sudo docker compose build && sudo docker compose up -d
 
 Prisma schema is applied via `database/mariadb.init.sql`. After schema changes run `npm run db:push` on a dev machine or re-run the SQL migration.
 
+**Important:** Container Manager builds from `/volume1/docker-projects/photodropper`. Keep that folder in sync with git (must include `src/app/api/photos/`). After pulling code:
+
+```bash
+cd /volume1/docker-projects/photodropper
+mysql -u photodropper -p photodropper < database/migrations/20260628_add_media_columns.sql
+sudo docker compose build --no-cache && sudo docker compose up -d
+curl -s http://127.0.0.1:3012/api/health/storage   # should return {"ok":true,"path":"/data/photos"}
+curl -sI http://127.0.0.1:3012/api/photos/view/test.jpg   # JSON 404, not HTML
+```
+
 ---
 
 ## 4. Reverse proxy (HTTPS)
@@ -127,8 +137,9 @@ Same pattern as FamilyAlbum (`album.0x0001.org`):
 1. **Control Panel → Login Portal → Advanced → Reverse Proxy**
 2. Add rule:
    - **Source:** `https://photodropper.0x0001.org` (port 443)
-   - **Destination:** `http://localhost:3011` (or NAS LAN IP + `3011`)
-3. Ensure DNS for `photodropper.0x0001.org` points at the NAS (or your front door).
+   - **Destination:** `http://localhost:3011` (or your `PORT` from `.env`, e.g. `3012`)
+3. Increase upload body size for photos/videos: in the reverse proxy **Custom Header** or nginx config, set `client_max_body_size 550m;` (default 1 MB will block uploads).
+4. Ensure DNS for `photodropper.0x0001.org` points at the NAS (or your front door).
 4. In `.env`:
 
 ```env
@@ -173,7 +184,9 @@ Ensure MariaDB on the NAS allows remote connections from your laptop, or run Mar
 | Issue | Check |
 |-------|--------|
 | DB connection refused | MariaDB running; `127.0.0.1:3306` from host network container |
-| Upload fails | `PHOTOS_HOST_DIR` writable; `PHOTO_UPLOAD_PATH=/data/photos` in compose |
+| Upload fails | `PHOTOS_HOST_DIR` writable; `PHOTO_UPLOAD_PATH=/data/photos` in compose; reverse proxy `client_max_body_size` ≥ 550m |
+| Photos 404 (HTML page) | Stale Docker image — rebuild after syncing `src/app/api/photos/`; verify with `/api/health/storage` |
+| Photos 404 (JSON) | File missing from `PHOTOS_HOST_DIR`; dev/prod must share same folder if sharing DB |
 | QR wrong host | `PUBLIC_BASE_URL=https://photodropper.0x0001.org` |
 | Auth redirect loop | `NEXTAUTH_URL` must match browser URL; `AUTH_TRUST_HOST=true` |
 | Blank slideshow | Event selected; photos `visible=true`; playlist polling in browser console |

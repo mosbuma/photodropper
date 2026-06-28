@@ -11,6 +11,8 @@ datasource db {
 model SocialEvent {
   id                  String   @id @default(uuid()) @db.VarChar(36)
   name                String
+  slug                String   @unique @db.VarChar(64)
+  accessCode          String   @map("access_code") @db.VarChar(32)
   createdAt           DateTime @default(now()) @map("created_at") @db.DateTime(3)
   updatedAt           DateTime @default(now()) @updatedAt @map("updated_at") @db.DateTime(3)
   photoDurationMs     Int      @default(5000) @map("photo_duration_ms")
@@ -30,11 +32,16 @@ model Photo {
   eventId       String    @map("event_id") @db.VarChar(36)
   index         Int
   photoUrl      String    @map("photo_url") @db.VarChar(2048)
+  mediaType     String    @default("image") @map("media_type") @db.VarChar(16)
+  durationMs    Int?      @map("duration_ms")
+  thumbnailUrl  String?   @map("thumbnail_url") @db.VarChar(2048)
+  mimeType      String?   @map("mime_type") @db.VarChar(64)
   uploaderName  String?   @map("uploader_name") @db.VarChar(255)
   dateTaken     String?   @map("date_taken") @db.VarChar(64)
   coordinates   String?   @db.VarChar(64)
   location      String?   @db.Text
   visible       Boolean   @default(false)
+  flaggedNotOk  Boolean   @default(false) @map("flagged_not_ok")
   createdAt     DateTime  @default(now()) @map("created_at") @db.DateTime(3)
   updatedAt     DateTime  @default(now()) @updatedAt @map("updated_at") @db.DateTime(3)
   scheduleCount Int       @default(0) @map("schedule_count")

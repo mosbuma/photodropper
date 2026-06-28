@@ -6,11 +6,16 @@ export interface PhotoStreamItem {
   eventId: string;
   index: number;
   photoUrl: string;
+  mediaType: 'image' | 'video';
+  durationMs: number | null;
+  thumbnailUrl: string | null;
+  mimeType: string | null;
   uploaderName: string | null;
   dateTaken: string | null;
   coordinates: string | null;
   location: string | null;
   visible: boolean;
+  flaggedNotOk?: boolean;
   updatedAt: string | null;
   scheduleCount: number;
   showCount: number;
@@ -43,6 +48,7 @@ export interface Playlist {
   eventCommentStream: CommentStreamItem[]
   commentStyle: 'TICKER' | 'COMICBOOK'
   scrollSpeedPct: number
+  photoDurationMs: number
   enablePhotoComments: boolean
   enableEventComments: boolean
 }

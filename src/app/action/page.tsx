@@ -1,18 +1,27 @@
 'use client'
 
-import { useSearchParams } from 'next/navigation'
+import { useSearchParams, useRouter } from 'next/navigation'
 import { useState, useEffect } from 'react'
 import UploadPhotoPopup from '@/components/action/UploadPhotoPopup'
 import CommentPopup from '@/components/action/CommentPopup'
+import WelcomePopup, { HelpButton } from '@/components/action/WelcomePopup'
+import MediaThumbnail from '@/components/display/MediaThumbnail'
+import { shouldShowWelcome } from '@/lib/welcomeStorage'
+import { verifyAndGrantEventAccess } from '@/lib/eventAccessClient'
+import { getEventAccessCode, grantEventAccess, hasEventAccess } from '@/lib/eventAccessStorage'
+import { buildSlideshowPath } from '@/lib/eventAccess'
 
 interface SocialEvent {
   id: string
   name: string
+  slug?: string
   createdAt: string
   updatedAt: string
   photoDurationMs: number
   scrollSpeedPct: number
   commentStyle: 'TICKER' | 'COMICBOOK'
+  enablePhotoComments?: boolean
+  enableEventComments?: boolean
 }
 
 interface Photo {
@@ -20,11 +29,14 @@ interface Photo {
   eventId: string
   index: number
   photoUrl: string
+  mediaType?: 'image' | 'video'
+  thumbnailUrl?: string | null
   uploaderName?: string
   dateTaken?: string
   coordinates?: string
   location?: string
   visible: boolean
+  flaggedNotOk?: boolean
   createdAt: string
   updatedAt: string
   comments: Comment[]
@@ -44,8 +56,10 @@ interface Comment {
 
 export default function ActionPage() {
   const searchParams = useSearchParams()
+  const router = useRouter()
   const eventId = searchParams.get('event') || ''
   const photoId = searchParams.get('photo') || ''
+  const codeParam = searchParams.get('code') || ''
 
   const [showUpload, setShowUpload] = useState(false)
   const [showPhotoComment, setShowPhotoComment] = useState(false)
@@ -54,23 +68,62 @@ export default function ActionPage() {
   const [photo, setPhoto] = useState<Photo | null>(null)
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState<string | null>(null)
-  const [eventSettings, setEventSettings] = useState<{ enablePhotoComments?: boolean; enableEventComments?: boolean }>({});
+  const [accessCode, setAccessCode] = useState('')
+  const [accessError, setAccessError] = useState<string | null>(null)
+  const [accessUnlocked, setAccessUnlocked] = useState(false)
+  const [showWelcome, setShowWelcome] = useState(false)
+  const [welcomePersistDismiss, setWelcomePersistDismiss] = useState(true)
+  const [flagging, setFlagging] = useState(false)
+  const [flagMessage, setFlagMessage] = useState<string | null>(null)
 
-  // Fetch event details
   useEffect(() => {
-    async function fetchEvent() {
+    async function unlockAndLoad() {
       if (!eventId) {
         setLoading(false)
         return
       }
 
+      setLoading(true)
+      setError(null)
+      setAccessError(null)
+
+      let code = codeParam || getEventAccessCode(eventId) || ''
+
+      if (codeParam) {
+        const verified = await verifyAndGrantEventAccess({ eventId, code: codeParam })
+        if (!verified.ok) {
+          setAccessUnlocked(false)
+          setAccessCode(codeParam)
+          setAccessError('Ongeldige toegangscode voor dit feest.')
+          setLoading(false)
+          return
+        }
+        code = codeParam
+      } else if (hasEventAccess(eventId)) {
+        code = getEventAccessCode(eventId) || code
+      } else {
+        setAccessUnlocked(false)
+        setAccessCode('')
+        setLoading(false)
+        return
+      }
+
+      grantEventAccess(eventId, code)
+      setAccessCode(code)
+      setAccessUnlocked(true)
+
       try {
         const response = await fetch(`/api/social_events/${eventId}`)
-        if (response.ok) {
-          const eventData = await response.json()
-          setEvent(eventData)
-        } else {
+        if (!response.ok) {
           setError('Event not found')
+          setLoading(false)
+          return
+        }
+        const eventData = await response.json()
+        setEvent(eventData)
+        if (shouldShowWelcome()) {
+          setWelcomePersistDismiss(true)
+          setShowWelcome(true)
         }
       } catch {
         setError('Failed to load event')
@@ -79,13 +132,12 @@ export default function ActionPage() {
       }
     }
 
-    fetchEvent()
-  }, [eventId])
+    unlockAndLoad()
+  }, [eventId, codeParam])
 
-  // Fetch photo details if photoId is provided
   useEffect(() => {
     async function fetchPhoto() {
-      if (!photoId) {
+      if (!photoId || !accessUnlocked) {
         return
       }
 
@@ -94,8 +146,6 @@ export default function ActionPage() {
         if (response.ok) {
           const photoData = await response.json()
           setPhoto(photoData)
-        } else {
-          console.error('Photo not found:', photoId)
         }
       } catch {
         console.error('Failed to load photo')
@@ -103,29 +153,75 @@ export default function ActionPage() {
     }
 
     fetchPhoto()
-  }, [photoId])
+  }, [photoId, accessUnlocked])
 
-  // Fetch event settings on mount or when eventId changes
-  useEffect(() => {
-    if (!eventId) return;
-    fetch(`/api/social_events?id=${eventId}`)
-      .then(res => res.ok ? res.json() : null)
-      .then(data => {
-        if (data && data[0]) {
-          setEventSettings({
-            enablePhotoComments: data[0].enablePhotoComments,
-            enableEventComments: data[0].enableEventComments,
-          });
+  const handleFlagNotOk = async () => {
+    if (!photoId || !accessCode || flagging) return
+    if (!window.confirm('Deze foto of video verbergen van het scherm?')) return
+
+    setFlagging(true)
+    setFlagMessage(null)
+    try {
+      const response = await fetch(`/api/photos/${photoId}/flag-not-ok`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ accessCode }),
+      })
+      if (!response.ok) {
+        setFlagMessage('Kon niet verbergen. Probeer het opnieuw.')
+        return
+      }
+      const updated = await response.json()
+      setPhoto(updated)
+      setFlagMessage('Bedankt — deze is van het scherm gehaald.')
+    } catch {
+      setFlagMessage('Kon niet verbergen. Probeer het opnieuw.')
+    } finally {
+      setFlagging(false)
+    }
+  }
+
+  const handleAccessSubmit = async (e: React.FormEvent) => {
+    e.preventDefault()
+    if (!eventId || !accessCode.trim()) return
+
+    setAccessError(null)
+    setLoading(true)
+    const verified = await verifyAndGrantEventAccess({ eventId, code: accessCode.trim() })
+    if (!verified.ok) {
+      setAccessError('Ongeldige toegangscode.')
+      setLoading(false)
+      return
+    }
+
+    grantEventAccess(eventId, accessCode.trim())
+    setAccessUnlocked(true)
+
+    try {
+      const response = await fetch(`/api/social_events/${eventId}`)
+      if (response.ok) {
+        const eventData = await response.json()
+        setEvent(eventData)
+        if (shouldShowWelcome()) {
+          setWelcomePersistDismiss(true)
+          setShowWelcome(true)
         }
-      });
-  }, [eventId]);
+      } else {
+        setError('Event not found')
+      }
+    } catch {
+      setError('Failed to load event')
+    } finally {
+      setLoading(false)
+    }
+  }
 
   if (!eventId) {
     return (
       <div className="min-h-screen flex items-center justify-center bg-gray-900 text-white">
         <div className="text-center">
-          <h1 className="text-2xl font-bold mb-4">Invalid QR Code</h1>
-          <p>Missing event information.</p>
+          <h1 className="text-2xl font-bold mb-4">Ongeldige link</h1>
+          <p>Deze link mist feestinformatie. Gebruik de uitnodigingslink van het feest.</p>
         </div>
       </div>
     )
@@ -136,8 +232,37 @@ export default function ActionPage() {
       <div className="min-h-screen flex items-center justify-center bg-gray-900 text-white">
         <div className="text-center">
           <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-white mx-auto mb-4"></div>
-          <p>Loading...</p>
+          <p>Laden...</p>
         </div>
+      </div>
+    )
+  }
+
+  if (!accessUnlocked) {
+    return (
+      <div className="min-h-screen flex items-center justify-center bg-gray-900 text-white px-4">
+        <form onSubmit={handleAccessSubmit} className="bg-gray-800 rounded-lg p-8 shadow-lg w-full max-w-md">
+          <h1 className="text-2xl font-bold mb-3 text-center">Feesttoegang</h1>
+          <p className="text-gray-300 text-sm mb-6 text-center">
+            Voer de toegangscode in die je van de organisator hebt gekregen.
+          </p>
+          <input
+            type="text"
+            value={accessCode}
+            onChange={e => setAccessCode(e.target.value.toUpperCase())}
+            placeholder="Toegangscode"
+            className="w-full px-3 py-2 rounded bg-gray-900 border border-gray-600 mb-4 uppercase tracking-widest"
+            autoComplete="off"
+          />
+          {accessError && <p className="text-red-400 text-sm mb-4">{accessError}</p>}
+          <button
+            type="submit"
+            disabled={!accessCode.trim()}
+            className="w-full bg-green-600 hover:bg-green-700 disabled:bg-gray-600 text-white py-2 rounded font-medium"
+          >
+            Inloggen
+          </button>
+        </form>
       </div>
     )
   }
@@ -146,37 +271,57 @@ export default function ActionPage() {
     return (
       <div className="min-h-screen flex items-center justify-center bg-gray-900 text-white">
         <div className="text-center">
-          <h1 className="text-2xl font-bold mb-4">Error</h1>
+          <h1 className="text-2xl font-bold mb-4">Fout</h1>
           <p>{error || 'Failed to load event'}</p>
         </div>
       </div>
     )
   }
 
-  console.log(`[ActionPage] eventId: ${eventId}, photoId: ${photoId}, eventName: ${event.name}`)
-
   return (
     <div className="min-h-screen bg-gray-900 text-white relative">
-      {/* Background photo display */}
+      {showWelcome && (
+        <WelcomePopup
+          eventName={event.name}
+          enablePhotoComments={event.enablePhotoComments}
+          enableEventComments={event.enableEventComments}
+          persistDismiss={welcomePersistDismiss}
+          onClose={() => setShowWelcome(false)}
+        />
+      )}
+
+      <div className="absolute top-4 right-4 z-20">
+        <HelpButton
+          onClick={() => {
+            setWelcomePersistDismiss(false)
+            setShowWelcome(true)
+          }}
+          className="bg-gray-700 hover:bg-gray-600 text-white border border-gray-600"
+        />
+      </div>
+
       {photo?.photoUrl && (
         <div className="absolute inset-0 bg-black">
-          { /* eslint-disable-next-line @next/next/no-img-element */}
-          <img
-            src={photo.photoUrl}
-            alt="Background photo"
-            className="w-full h-full object-cover opacity-30"
+          <MediaThumbnail
+            photoUrl={photo.photoUrl}
+            thumbnailUrl={photo.thumbnailUrl}
+            mediaType={photo.mediaType || 'image'}
+            className="w-full h-full object-contain opacity-30"
+            alt="Background"
+            videoMuted
+            videoLoop
           />
         </div>
       )}
 
-      {/* Action popup overlay */}
       <div className="relative z-10 min-h-screen flex items-center justify-center">
         <div className="bg-gray-800 rounded-lg p-8 shadow-lg w-full max-w-md text-center">
           <h1 className="text-2xl font-bold mb-6">{event.name}</h1>
           <p className="mb-8">What would you like to do?</p>
-          
-          <div className="flex flex-col gap-4 mb-8 items-center">
+
+          <div className="grid grid-cols-2 gap-4 mx-auto w-fit mb-8">
             <button
+              type="button"
               className="flex flex-col items-center justify-center bg-gray-600 hover:bg-gray-700 text-white w-32 h-32 rounded-lg transition-colors"
               onClick={() => setShowUpload(true)}
             >
@@ -187,8 +332,21 @@ export default function ActionPage() {
               <span className="text-sm font-medium">Upload</span>
             </button>
 
-            {photoId && eventSettings.enablePhotoComments !== false && (
+            <button
+              type="button"
+              className="flex flex-col items-center justify-center bg-gray-600 hover:bg-gray-700 text-white w-32 h-32 rounded-lg transition-colors"
+              onClick={() => router.push(buildSlideshowPath(eventId, accessCode))}
+            >
+              <svg className="w-8 h-8 mb-2" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 12a3 3 0 11-6 0 3 3 0 016 0z" />
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M2.458 12C3.732 7.943 7.523 5 12 5c4.478 0 8.268 2.943 9.542 7-1.274 4.057-5.064 7-9.542 7-4.477 0-8.268-2.943-9.542-7z" />
+              </svg>
+              <span className="text-sm font-medium">Kijken</span>
+            </button>
+
+            {photoId && event.enablePhotoComments !== false && (
               <button
+                type="button"
                 className="flex flex-col items-center justify-center bg-gray-600 hover:bg-gray-700 text-white w-32 h-32 rounded-lg transition-colors"
                 onClick={() => setShowPhotoComment(true)}
               >
@@ -199,8 +357,31 @@ export default function ActionPage() {
               </button>
             )}
 
-            {eventSettings.enableEventComments && (
+            {photoId && !photo?.flaggedNotOk && (
               <button
+                type="button"
+                disabled={flagging}
+                className="flex flex-col items-center justify-center bg-red-950 hover:bg-red-900 disabled:opacity-50 text-white w-32 h-32 rounded-lg transition-colors"
+                onClick={handleFlagNotOk}
+              >
+                <svg className="w-8 h-8 mb-2" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                  <circle cx="12" cy="12" r="9" strokeWidth={2} />
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 10h.01M15 10h.01" />
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M8 15q4 4 8 0" />
+                </svg>
+                <span className="text-sm font-medium">Niet oké</span>
+              </button>
+            )}
+          </div>
+
+          {flagMessage && (
+            <p className="text-sm text-green-400 px-2 mb-4 text-center">{flagMessage}</p>
+          )}
+
+          {event.enableEventComments && (
+            <div className="flex justify-center mb-8">
+              <button
+                type="button"
                 className="flex flex-col items-center justify-center bg-gray-600 hover:bg-gray-700 text-white w-32 h-32 rounded-lg transition-colors"
                 onClick={() => setShowEventComment(true)}
               >
@@ -209,28 +390,31 @@ export default function ActionPage() {
                 </svg>
                 <span className="text-sm font-medium">Event Comment</span>
               </button>
-            )}
-          </div>
+            </div>
+          )}
 
           {showUpload && (
-            <UploadPhotoPopup 
+            <UploadPhotoPopup
               eventId={eventId}
-              eventName={event?.name}
+              eventName={event.name}
+              accessCode={accessCode}
               onClose={() => setShowUpload(false)}
             />
           )}
           {showPhotoComment && (
-            <CommentPopup 
+            <CommentPopup
               eventId={eventId}
               photoId={photoId}
               type="photo"
+              accessCode={accessCode}
               onClose={() => setShowPhotoComment(false)}
             />
           )}
           {showEventComment && (
-            <CommentPopup 
+            <CommentPopup
               eventId={eventId}
               type="event"
+              accessCode={accessCode}
               onClose={() => setShowEventComment(false)}
             />
           )}
@@ -238,4 +422,4 @@ export default function ActionPage() {
       </div>
     </div>
   )
-} 
+}

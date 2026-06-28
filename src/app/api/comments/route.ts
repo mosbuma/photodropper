@@ -3,6 +3,7 @@ import { prisma } from '@/lib/prisma'
 import { commentSchema } from '@/types/zodSchemas'
 import { getServerSession } from 'next-auth'
 import { authOptions } from '@/lib/auth'
+import { readAccessCodeFromBody, requireGuestEventAccess } from '@/lib/eventAccessGuard'
 
 // GET: List comments for an event
 export async function GET(req: NextRequest) {
@@ -44,8 +45,16 @@ export async function POST(req: NextRequest) {
       return NextResponse.json({ error: parse.error.flatten() }, { status: 400 })
     }
 
+    const accessDenied = await requireGuestEventAccess(
+      parse.data.eventId,
+      readAccessCodeFromBody(body)
+    )
+    if (accessDenied) return accessDenied
+
+    const { accessCode: _accessCode, ...commentData } = parse.data
+
     const comment = await prisma.comment.create({
-      data: parse.data
+      data: commentData,
     })
 
     return NextResponse.json(comment)
