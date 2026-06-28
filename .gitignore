@@ -105,8 +105,8 @@ jspm_packages/
 # Prisma
 prisma/migrations/
 
-# Uploaded photos (if stored locally)
-photos/
+# Uploaded photos (root folder only — do not use `photos/` or it ignores src/app/api/photos/)
+/photos/
 uploads/
 import/
 

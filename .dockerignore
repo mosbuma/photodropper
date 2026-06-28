@@ -6,7 +6,7 @@ node_modules
 .env.*
 !.env.example
 .cache
-photos
+/photos
 import
 *.md
 !README.md
